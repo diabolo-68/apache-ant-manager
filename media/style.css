@@ -1,0 +1,385 @@
+/* Apache Ant Manager - Configuration Panel Styles */
+
+:root {
+    --background: var(--vscode-editor-background);
+    --foreground: var(--vscode-editor-foreground);
+    --border: var(--vscode-panel-border);
+    --input-background: var(--vscode-input-background);
+    --input-foreground: var(--vscode-input-foreground);
+    --input-border: var(--vscode-input-border);
+    --button-background: var(--vscode-button-background);
+    --button-foreground: var(--vscode-button-foreground);
+    --button-hover: var(--vscode-button-hoverBackground);
+    --secondary-button-background: var(--vscode-button-secondaryBackground);
+    --secondary-button-foreground: var(--vscode-button-secondaryForeground);
+    --highlight: var(--vscode-focusBorder);
+    --list-hover: var(--vscode-list-hoverBackground);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--foreground);
+    background: var(--background);
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.5em;
+    font-weight: 500;
+}
+
+h2 {
+    font-size: 1.1em;
+    font-weight: 500;
+    margin: 20px 0 10px 0;
+    color: var(--vscode-foreground);
+}
+
+section {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: var(--vscode-sideBar-background);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+/* Build File Section */
+.build-file-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.build-file-row input {
+    flex: 1;
+    padding: 6px 10px;
+    background: var(--input-background);
+    color: var(--input-foreground);
+    border: 1px solid var(--input-border);
+    border-radius: 3px;
+}
+
+.project-info {
+    margin-top: 10px;
+    display: flex;
+    gap: 20px;
+    font-size: 0.9em;
+    color: var(--vscode-descriptionForeground);
+}
+
+/* Targets Section */
+.help-text {
+    font-size: 0.85em;
+    color: var(--vscode-descriptionForeground);
+    margin-bottom: 10px;
+}
+
+.targets-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+}
+
+.target-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    transition: background-color 0.1s;
+}
+
+.target-item:last-child {
+    border-bottom: none;
+}
+
+.target-item:hover {
+    background: var(--list-hover);
+}
+
+.target-checkbox {
+    margin-right: 10px;
+}
+
+.target-checkbox input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.target-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.target-name {
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.target-description {
+    font-size: 0.85em;
+    color: var(--vscode-descriptionForeground);
+}
+
+.target-depends {
+    font-size: 0.8em;
+    color: var(--vscode-textLink-foreground);
+}
+
+.target-order {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.order-btn {
+    padding: 2px 6px;
+    font-size: 10px;
+    background: var(--secondary-button-background);
+    color: var(--secondary-button-foreground);
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.order-btn:hover {
+    opacity: 1;
+}
+
+/* Selected Order Section */
+.selected-order {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 10px;
+    background: var(--input-background);
+    border-radius: 3px;
+}
+
+.order-tag {
+    padding: 4px 10px;
+    background: var(--button-background);
+    color: var(--button-foreground);
+    border-radius: 12px;
+    font-size: 0.85em;
+}
+
+.no-selection {
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+}
+
+/* Properties Section */
+.properties-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.property-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.property-row input {
+    flex: 1;
+    padding: 6px 10px;
+    background: var(--input-background);
+    color: var(--input-foreground);
+    border: 1px solid var(--input-border);
+    border-radius: 3px;
+}
+
+/* Arguments Section */
+.arguments-section textarea {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--input-background);
+    color: var(--input-foreground);
+    border: 1px solid var(--input-border);
+    border-radius: 3px;
+    font-family: var(--vscode-editor-font-family), monospace;
+    font-size: var(--vscode-editor-font-size);
+    resize: vertical;
+    min-height: 80px;
+}
+
+.arguments-section textarea::placeholder {
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.7;
+}
+
+/* Task Name Section */
+
+#addPropertyBtn:hover {
+    background: var(--list-hover);
+}
+
+/* Task Name Section */
+.task-name-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.task-name-row label {
+    white-space: nowrap;
+}
+
+.task-name-row input {
+    flex: 1;
+    padding: 6px 10px;
+    background: var(--input-background);
+    color: var(--input-foreground);
+    border: 1px solid var(--input-border);
+    border-radius: 3px;
+}
+
+/* Environment Settings Section */
+.env-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.env-row:last-child {
+    margin-bottom: 0;
+}
+
+.env-row label {
+    min-width: 140px;
+    white-space: nowrap;
+}
+
+.input-with-browse {
+    flex: 1;
+    display: flex;
+    gap: 8px;
+}
+
+.input-with-browse input {
+    flex: 1;
+    padding: 6px 10px;
+    background: var(--input-background);
+    color: var(--input-foreground);
+    border: 1px solid var(--input-border);
+    border-radius: 3px;
+}
+
+.browse-btn {
+    padding: 6px 10px;
+    background: var(--secondary-button-background);
+    color: var(--secondary-button-foreground);
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.browse-btn:hover {
+    opacity: 0.9;
+}
+
+select {
+    flex: 1;
+    padding: 6px 10px;
+    background: var(--input-background);
+    color: var(--input-foreground);
+    border: 1px solid var(--input-border);
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+select:focus {
+    outline: 1px solid var(--highlight);
+    outline-offset: -1px;
+}
+
+/* Action Buttons */
+.actions {
+    display: flex;
+    gap: 10px;
+    padding: 15px;
+    background: var(--vscode-sideBar-background);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.95em;
+    transition: background-color 0.1s;
+}
+
+button.primary {
+    background: var(--button-background);
+    color: var(--button-foreground);
+}
+
+button.primary:hover {
+    background: var(--button-hover);
+}
+
+#saveTaskBtn {
+    background: var(--secondary-button-background);
+    color: var(--secondary-button-foreground);
+}
+
+#saveTaskBtn:hover {
+    opacity: 0.9;
+}
+
+#browseBuildFile, #refreshBtn {
+    padding: 6px 12px;
+    background: var(--secondary-button-background);
+    color: var(--secondary-button-foreground);
+}
+
+#refreshBtn {
+    padding: 6px 10px;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--vscode-scrollbarSlider-background);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-hoverBackground);
+    border-radius: 5px;
+}
