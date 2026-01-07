@@ -99,7 +99,6 @@ public class AntParser {
             buildInfo.setBuildFile(buildFile.getAbsolutePath());
 
             List<AntTarget> targets = new ArrayList<>();
-            @SuppressWarnings("unchecked")
             Hashtable<String, Target> projectTargets = project.getTargets();
 
             for (Map.Entry<String, Target> entry : projectTargets.entrySet()) {

@@ -1,21 +1,39 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { AntConfigurationPanel, EditContext } from './panels/AntConfigurationPanel';
 import { AntTasksListPanel } from './panels/AntTasksListPanel';
-import { AntTargetsProvider } from './providers/AntTargetsProvider';
 import { AntParserService } from './services/AntParserService';
 import { AntTaskService, AntTaskConfig } from './services/AntTaskService';
 
-let antTargetsProvider: AntTargetsProvider;
+/**
+ * Check if a file is an Apache Ant build file by looking for DOCTYPE or project element.
+ */
+async function isAntBuildFile(filePath: string): Promise<boolean> {
+    try {
+        // Read just the first portion of the file (enough to find DOCTYPE/project element)
+        const buffer = Buffer.alloc(2048);
+        const fd = fs.openSync(filePath, 'r');
+        const bytesRead = fs.readSync(fd, buffer, 0, 2048, 0);
+        fs.closeSync(fd);
+        
+        const content = buffer.toString('utf8', 0, bytesRead);
+        
+        // Check for Ant DOCTYPE or project element with xmlns for Ant
+        return /<!DOCTYPE\s+project\b/i.test(content) || 
+               /<project\b[^>]*\bxmlns\s*=\s*["']antlib:/i.test(content) ||
+               /<project\b[^>]*\bdefault\s*=/i.test(content) ||
+               /<project\b[^>]*\bbasedir\s*=/i.test(content);
+    } catch {
+        return false;
+    }
+}
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Apache Ant Manager is now active');
 
     const parserService = new AntParserService(context);
     const taskService = new AntTaskService();
-
-    // Register the Ant Targets tree view provider
-    antTargetsProvider = new AntTargetsProvider(parserService);
-    vscode.window.registerTreeDataProvider('antTargets', antTargetsProvider);
 
     // Helper function to open the task editor
     const openTaskEditor = (task: AntTaskConfig | null, isNew: boolean) => {
@@ -48,31 +66,28 @@ export function activate(context: vscode.ExtensionContext) {
             });
         } else {
             // Edit existing task
-            buildFilePath = task.buildFile || '';
+            const rawBuildFilePath = task.buildFile || '';
             
-            // Get workspace folder from the task's _workspaceFolder property (set by getAntTasks)
-            // or try to parse from the buildFile path
-            let originalWorkspaceFolder: string | undefined = (task as any)._workspaceFolder;
-            if (!originalWorkspaceFolder && buildFilePath) {
-                // Extract workspace folder from ${workspaceFolder:NAME} syntax as fallback
-                const match = buildFilePath.match(/\$\{workspaceFolder:([^}]+)\}/);
-                if (match) {
-                    originalWorkspaceFolder = match[1];
-                } else {
-                    // Default to first workspace folder
-                    const folders = vscode.workspace.workspaceFolders;
-                    if (folders && folders.length > 0) {
-                        originalWorkspaceFolder = folders[0].name;
-                    }
+            // Get workspace folder from the task (set by getAntTasks)
+            const taskWorkspaceFolder = (task as any)._workspaceFolder;
+            
+            // Resolve the build file path the same way as the refresh button
+            let buildFilePath = taskService.resolveWorkspacePath(rawBuildFilePath, taskWorkspaceFolder);
+            
+            // If it's still a relative path, resolve it relative to working directory
+            if (!path.isAbsolute(buildFilePath) && !buildFilePath.startsWith('${')) {
+                let workingDir = task.workingDirectory || '';
+                if (workingDir) {
+                    workingDir = taskService.resolveWorkspacePath(workingDir, taskWorkspaceFolder);
+                    buildFilePath = path.resolve(workingDir, buildFilePath);
                 }
             }
             
             editContext = {
                 isEditMode: true,
                 originalLabel: task.label,
-                originalWorkspaceFolder: originalWorkspaceFolder,
-                workspaceFolder: originalWorkspaceFolder,
                 task: task,
+                workspaceFolder: taskWorkspaceFolder,
                 onSaveComplete: () => {
                     AntTasksListPanel.currentPanel?.refresh();
                 }
@@ -97,7 +112,13 @@ export function activate(context: vscode.ExtensionContext) {
         'apache-ant-manager.openConfiguration',
         async (uri?: vscode.Uri) => {
             if (uri) {
-                // If called with a build.xml file, open the editor directly
+                // Validate that this is an Ant build file
+                const isAntFile = await isAntBuildFile(uri.fsPath);
+                if (!isAntFile) {
+                    vscode.window.showWarningMessage('This file does not appear to be an Apache Ant build file.');
+                    return;
+                }
+                // Open the editor for this Ant file
                 AntConfigurationPanel.createOrShow(
                     context.extensionUri,
                     parserService,
@@ -183,11 +204,10 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
-    // Command: Refresh tree view
+    // Command: Refresh
     const refreshCommand = vscode.commands.registerCommand(
         'apache-ant-manager.refresh',
         () => {
-            antTargetsProvider.refresh();
             AntTasksListPanel.currentPanel?.refresh();
         }
     );

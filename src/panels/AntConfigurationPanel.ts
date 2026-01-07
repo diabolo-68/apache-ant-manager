@@ -8,6 +8,7 @@ import { AntBuildInfo } from '../types/antTypes';
  * Form state to preserve user edits between re-renders.
  */
 interface FormState {
+    workspaceFolder?: string;
     workingDirectory?: string;
     buildFilePath?: string;
     antHome?: string;
@@ -24,7 +25,6 @@ interface FormState {
 export interface EditContext {
     isEditMode: boolean;
     originalLabel?: string;
-    originalWorkspaceFolder?: string;
     task?: AntTaskConfig;
     workspaceFolder?: string;
     onSaveComplete?: () => void;
@@ -120,20 +120,10 @@ export class AntConfigurationPanel {
                 switch (message.command) {
                     case 'saveTask':
                         try {
-                            // Resolve the build file path
-                            let resolvedBuildFile = this._taskService.resolveWorkspacePath(message.buildFilePath);
-                            
-                            // If it's still a relative path, resolve it against working directory
-                            if (!path.isAbsolute(resolvedBuildFile) && !resolvedBuildFile.startsWith('${')) {
-                                let workingDir = message.workingDirectory || '';
-                                if (workingDir) {
-                                    workingDir = this._taskService.resolveWorkspacePath(workingDir);
-                                    resolvedBuildFile = path.resolve(workingDir, resolvedBuildFile);
-                                }
-                            }
-                            
+                            // Pass the build file path as-is to preserve user's input format
+                            // (don't resolve it - generateTaskConfig will keep it exactly as entered)
                             const taskConfig = this._taskService.generateTaskConfig(
-                                resolvedBuildFile,
+                                message.buildFilePath,
                                 message.targets,
                                 message.taskName,
                                 message.additionalArgs || '',
@@ -143,27 +133,11 @@ export class AntConfigurationPanel {
                                 message.shell
                             );
                             
+                            // Use the workspace folder selected by the user
                             const targetWorkspaceFolder = message.workspaceFolder;
                             
                             if (this._editContext.isEditMode && this._editContext.originalLabel) {
-                                // Check if workspace folder has changed
-                                const originalWorkspace = this._editContext.originalWorkspaceFolder;
-                                const workspaceChanged = originalWorkspace && targetWorkspaceFolder && 
-                                    originalWorkspace !== targetWorkspaceFolder;
-                                
-                                if (workspaceChanged) {
-                                    // Workspace changed: delete from old workspace, create in new
-                                    try {
-                                        await this._taskService.deleteTask(this._editContext.originalLabel, originalWorkspace);
-                                    } catch (e) {
-                                        // Ignore if task doesn't exist in old workspace
-                                        console.warn(`Could not delete task from original workspace: ${e}`);
-                                    }
-                                    await this._taskService.saveTaskToWorkspace(taskConfig, targetWorkspaceFolder);
-                                } else {
-                                    // Same workspace: update in place
-                                    await this._taskService.updateTask(this._editContext.originalLabel, taskConfig, targetWorkspaceFolder);
-                                }
+                                await this._taskService.updateTask(this._editContext.originalLabel, taskConfig, targetWorkspaceFolder);
                             } else {
                                 await this._taskService.saveTaskToWorkspace(taskConfig, targetWorkspaceFolder);
                             }
@@ -222,82 +196,26 @@ export class AntConfigurationPanel {
                         // Store form state before refresh
                         if (message.formState) {
                             this._formState = message.formState;
+                            
+                            // Update build file path if it changed
+                            if (message.formState.buildFilePath) {
+                                const workspaceFolder = message.formState.workspaceFolder;
+                                let resolvedPath = this._taskService.resolveWorkspacePath(message.formState.buildFilePath, workspaceFolder);
+                                
+                                // If it's still a relative path, resolve it relative to working directory
+                                if (!path.isAbsolute(resolvedPath) && !resolvedPath.startsWith('${')) {
+                                    let workingDir = message.formState.workingDirectory || '';
+                                    if (workingDir) {
+                                        workingDir = this._taskService.resolveWorkspacePath(workingDir, workspaceFolder);
+                                        resolvedPath = path.resolve(workingDir, resolvedPath);
+                                    }
+                                }
+                                
+                                this._buildFilePath = resolvedPath;
+                            }
                         }
                         this._parserService.clearCache(this._buildFilePath);
                         await this._update();
-                        break;
-                    case 'workspaceFolderChanged':
-                        // Update paths when workspace folder changes
-                        if (message.formState) {
-                            const oldBuildPath = message.formState.buildFilePath;
-                            const oldWorkingDir = message.formState.workingDirectory;
-                            const newFolderName = message.newWorkspaceFolder;
-                            
-                            // Get the new workspace folder
-                            const workspaceFolders = this._taskService.getWorkspaceFolders();
-                            const newFolder = workspaceFolders.find(f => f.name === newFolderName);
-                            
-                            if (!newFolder) {
-                                vscode.window.showErrorMessage(`Workspace folder "${newFolderName}" not found`);
-                                break;
-                            }
-                            
-                            // Update build file path to use new workspace folder
-                            if (oldBuildPath) {
-                                if (oldBuildPath.includes('${workspaceFolder')) {
-                                    // Replace old workspace folder reference with new one
-                                    // Extract the relative part after ${workspaceFolder...}
-                                    const relativePart = oldBuildPath.replace(/\$\{workspaceFolder(?::[^}]+)?\}[\/\\]?/, '');
-                                    message.formState.buildFilePath = relativePart 
-                                        ? `\${workspaceFolder:${newFolderName}}/${relativePart}`
-                                        : `\${workspaceFolder:${newFolderName}}`;
-                                } else if (path.isAbsolute(oldBuildPath)) {
-                                    // Absolute path - try to make it relative to new workspace
-                                    const newRelative = this._taskService.toWorkspaceRelativePath(oldBuildPath);
-                                    if (newRelative.includes('${workspaceFolder')) {
-                                        message.formState.buildFilePath = newRelative.replace(
-                                            /\$\{workspaceFolder(?::[^}]+)?\}/,
-                                            `\${workspaceFolder:${newFolderName}}`
-                                        );
-                                    } else {
-                                        // Keep as-is if can't convert
-                                        message.formState.buildFilePath = `\${workspaceFolder:${newFolderName}}/${path.basename(oldBuildPath)}`;
-                                    }
-                                } else {
-                                    // Relative path without ${workspaceFolder} - prepend new workspace folder
-                                    message.formState.buildFilePath = `\${workspaceFolder:${newFolderName}}/${oldBuildPath}`;
-                                }
-                            }
-                            
-                            // Also update working directory
-                            if (oldWorkingDir) {
-                                if (oldWorkingDir.includes('${workspaceFolder')) {
-                                    const relativePart = oldWorkingDir.replace(/\$\{workspaceFolder(?::[^}]+)?\}[\/\\]?/, '');
-                                    message.formState.workingDirectory = relativePart
-                                        ? `\${workspaceFolder:${newFolderName}}/${relativePart}`
-                                        : `\${workspaceFolder:${newFolderName}}`;
-                                } else if (path.isAbsolute(oldWorkingDir)) {
-                                    message.formState.workingDirectory = `\${workspaceFolder:${newFolderName}}`;
-                                } else {
-                                    // Relative path - prepend new workspace folder
-                                    message.formState.workingDirectory = oldWorkingDir
-                                        ? `\${workspaceFolder:${newFolderName}}/${oldWorkingDir}`
-                                        : `\${workspaceFolder:${newFolderName}}`;
-                                }
-                            } else {
-                                // Default to new workspace folder root
-                                message.formState.workingDirectory = `\${workspaceFolder:${newFolderName}}`;
-                            }
-                            
-                            this._formState = message.formState;
-                            this._editContext.workspaceFolder = newFolderName;
-                            
-                            // Always resolve and re-parse when workspace changes
-                            const resolvedBuildPath = this._taskService.resolveWorkspacePath(message.formState.buildFilePath);
-                            this._buildFilePath = resolvedBuildPath;
-                            this._parserService.clearCache();
-                            await this._update();
-                        }
                         break;
                     case 'updateBuildFilePath':
                         // Store form state before update
@@ -306,17 +224,18 @@ export class AntConfigurationPanel {
                         }
                         
                         // Resolve the build file path
+                        const workspaceFolder = message.formState?.workspaceFolder;
                         let resolvedPath = message.path;
                         
-                        // First try to resolve ${workspaceFolder} syntax
-                        resolvedPath = this._taskService.resolveWorkspacePath(resolvedPath);
+                        // First try to resolve ${workspaceFolder} syntax with the selected workspace
+                        resolvedPath = this._taskService.resolveWorkspacePath(resolvedPath, workspaceFolder);
                         
                         // If it's still a relative path (not absolute and not starting with ${),
                         // resolve it relative to the working directory
                         if (!path.isAbsolute(resolvedPath) && !resolvedPath.startsWith('${')) {
                             let workingDir = message.workingDirectory || '';
                             if (workingDir) {
-                                workingDir = this._taskService.resolveWorkspacePath(workingDir);
+                                workingDir = this._taskService.resolveWorkspacePath(workingDir, workspaceFolder);
                                 resolvedPath = path.resolve(workingDir, resolvedPath);
                             }
                         }
@@ -420,24 +339,30 @@ export class AntConfigurationPanel {
         const additionalArgs = this._formState.additionalArgs ?? editTask?.additionalArgs ?? '';
         const taskName = this._formState.taskName ?? (isEdit && editTask ? editTask.label : `Ant: ${this._buildInfo?.projectName || 'build'}`);
         
-        // Get path-related defaults - convert to workspace-relative for display
-        const defaultWorkingDir = path.dirname(this._buildFilePath);
-        // Keep working directory as-is to preserve user's ${workspaceFolder} syntax
-        // Only convert to workspace-relative if it's a new task with default working dir
-        const workingDirectory = this._formState.workingDirectory ?? 
-            editTask?.workingDirectory ?? 
-            this._taskService.toWorkspaceRelativePath(defaultWorkingDir);
+        // For editing, preserve original values from the task; for new tasks, calculate defaults
+        let workingDirectory: string;
+        let displayBuildFilePath: string;
+        
+        if (isEdit && editTask) {
+            // EDIT MODE: Preserve original values exactly as they are in the JSON
+            workingDirectory = this._formState.workingDirectory ?? editTask.workingDirectory ?? '';
+            displayBuildFilePath = this._formState.buildFilePath ?? editTask.buildFile ?? '';
+        } else {
+            // NEW TASK MODE: Calculate workspace-relative defaults
+            const defaultWorkingDir = path.dirname(this._buildFilePath);
+            workingDirectory = this._formState.workingDirectory ?? this._taskService.toWorkspaceRelativePath(defaultWorkingDir);
+            displayBuildFilePath = this._formState.buildFilePath ?? this._taskService.toWorkspaceRelativePath(this._buildFilePath);
+        }
+        
         const antHome = this._formState.antHome ?? editTask?.antHome ?? '';
         const javaHome = this._formState.javaHome ?? editTask?.javaHome ?? '';
         const shell = this._formState.shell ?? editTask?.shell ?? 'default';
-        
-        // Convert build file path to workspace-relative for display
-        const displayBuildFilePath = this._formState.buildFilePath ?? this._taskService.toWorkspaceRelativePath(this._buildFilePath);
         
         // Multi-root workspace support
         const isMultiRoot = this._taskService.isMultiRootWorkspace();
         const workspaceFolders = this._taskService.getWorkspaceFolders();
         const currentWorkspaceFolder = this._editContext.workspaceFolder || 
+            (this._editContext.task as any)?._workspaceFolder ||
             (workspaceFolders.length > 0 ? workspaceFolders[0].name : '');
 
         const buildInfo = this._buildInfo;
@@ -515,7 +440,7 @@ export class AntConfigurationPanel {
                     <input type="text" id="buildFilePath" value="${escapeHtml(displayBuildFilePath)}" 
                            placeholder="Path to build.xml">
                     <button id="browseBuildFile" class="browse-btn" title="Browse...">📁</button>
-                    <button id="refreshBtn" class="browse-btn" title="Refresh">🔄</button>
+                    <button id="refreshBtn" title="Refresh">🔄</button>
                 </div>
             </div>
             ${buildInfo ? `
@@ -726,7 +651,9 @@ export class AntConfigurationPanel {
 
         // Get current form state to preserve user edits during refresh
         function getFormState() {
+            const workspaceFolderSelect = document.getElementById('workspaceFolder');
             return {
+                workspaceFolder: workspaceFolderSelect ? workspaceFolderSelect.value : undefined,
                 workingDirectory: document.getElementById('workingDirectory').value,
                 buildFilePath: document.getElementById('buildFilePath').value,
                 antHome: document.getElementById('antHome').value,
@@ -742,19 +669,6 @@ export class AntConfigurationPanel {
         document.getElementById('refreshBtn').addEventListener('click', () => {
             vscode.postMessage({ command: 'refresh', formState: getFormState() });
         });
-
-        // Workspace folder dropdown change handler (multi-root workspaces)
-        const workspaceFolderSelect = document.getElementById('workspaceFolder');
-        if (workspaceFolderSelect) {
-            workspaceFolderSelect.addEventListener('change', (e) => {
-                const newFolder = e.target.value;
-                vscode.postMessage({ 
-                    command: 'workspaceFolderChanged', 
-                    newWorkspaceFolder: newFolder,
-                    formState: getFormState() 
-                });
-            });
-        }
 
         // Build file path change handler - reparse on blur or Enter
         const buildFileInput = document.getElementById('buildFilePath');

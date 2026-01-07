@@ -44,30 +44,9 @@
     "menus": {
       "explorer/context": [
         {
-          "when": "resourceFilename == build.xml",
+          "when": "resourceExtname == .xml",
           "command": "apache-ant-manager.openConfiguration",
           "group": "navigation"
-        }
-      ],
-      "view/title": [
-        {
-          "command": "apache-ant-manager.refresh",
-          "when": "view == antTargets",
-          "group": "navigation"
-        },
-        {
-          "command": "apache-ant-manager.selectBuildFile",
-          "when": "view == antTargets",
-          "group": "navigation"
-        }
-      ]
-    },
-    "views": {
-      "explorer": [
-        {
-          "id": "antTargets",
-          "name": "Ant Targets",
-          "when": "workspaceContains:**/build.xml"
         }
       ]
     },

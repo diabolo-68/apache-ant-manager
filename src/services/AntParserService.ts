@@ -27,12 +27,6 @@ export class AntParserService {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (workspaceFolders && workspaceFolders.length > 0) {
             value = value.replace(/\$\{workspaceFolder\}/g, workspaceFolders[0].uri.fsPath);
-            
-            // Resolve ${workspaceFolder:NAME}
-            value = value.replace(/\$\{workspaceFolder:([^}]+)\}/g, (match, name) => {
-                const folder = workspaceFolders.find(f => f.name === name);
-                return folder ? folder.uri.fsPath : match;
-            });
         }
         
         return value;
@@ -50,8 +44,10 @@ export class AntParserService {
 
         // Try Java parser first, fall back to XML parsing
         try {
+            console.log('Parsing script with Java Ant Parser');
             const buildInfo = await this.parseWithJava(buildFilePath);
             this.cache.set(buildFilePath, { info: buildInfo, timestamp: Date.now() });
+            console.log('Ant script parsed with the Java Ant Parser');
             return buildInfo;
         } catch (error) {
             console.warn('Java parser failed, falling back to XML parsing:', error);
@@ -157,6 +153,7 @@ export class AntParserService {
 
     /**
      * Parse a single XML file and recursively follow imports/includes.
+     * This is a fallback solution in case the Java parser failed.
      */
     private async parseXmlFile(
         filePath: string, 

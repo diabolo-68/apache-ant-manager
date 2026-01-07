@@ -3,17 +3,6 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 /**
- * Custom properties stored in ant-tasks.json (not in VS Code's tasks.json)
- */
-export interface AntTaskMetadata {
-    workingDirectory?: string;
-    antHome?: string;
-    javaHome?: string;
-    shell?: string;
-    additionalArgs?: string;
-}
-
-/**
  * Represents an Ant task configuration stored in tasks.json
  */
 export interface AntTaskConfig {
@@ -32,7 +21,7 @@ export interface AntTaskConfig {
     group?: { kind: string; isDefault: boolean };
     problemMatcher?: string | string[];
     presentation?: { reveal: string; panel: string };
-    // Parsed fields for UI (merged from ant-tasks.json)
+    // Parsed fields for UI (extracted from standard task properties)
     buildFile?: string;
     targets?: string[];
     additionalArgs?: string;
@@ -63,8 +52,7 @@ export class AntTaskService {
     }
 
     /**
-     * Convert an absolute path to a workspace-relative path using ${workspaceFolder:NAME}.
-     * Checks all workspace folders and returns the relative path for the matching one.
+     * Convert an absolute path to a workspace-relative path using ${workspaceFolder}.
      * Returns the original path if it's not within any workspace folder.
      */
     toWorkspaceRelativePath(absolutePath: string): string {
@@ -91,15 +79,7 @@ export class AntTaskService {
                 // Use forward slashes for consistency in tasks.json
                 const relativeWithSlashes = cleanRelative.replace(/\\/g, '/');
                 
-                // Use ${workspaceFolder:NAME} syntax for multi-root workspace support
-                // If only one workspace folder, use simple ${workspaceFolder}
-                if (workspaceFolders.length === 1) {
-                    return relativeWithSlashes ? `\${workspaceFolder}/${relativeWithSlashes}` : '${workspaceFolder}';
-                } else {
-                    return relativeWithSlashes 
-                        ? `\${workspaceFolder:${folder.name}}/${relativeWithSlashes}` 
-                        : `\${workspaceFolder:${folder.name}}`;
-                }
+                return relativeWithSlashes ? `\${workspaceFolder}/${relativeWithSlashes}` : '${workspaceFolder}';
             }
         }
         
@@ -107,32 +87,31 @@ export class AntTaskService {
     }
 
     /**
-     * Resolve a workspace-relative path (containing ${workspaceFolder} or ${workspaceFolder:NAME}) to an absolute path.
+     * Resolve a workspace-relative path (containing ${workspaceFolder}) to an absolute path.
+     * @param relativePath The path to resolve
+     * @param workspaceFolderName Optional specific workspace folder name to use for resolution
      */
-    resolveWorkspacePath(relativePath: string): string {
+    resolveWorkspacePath(relativePath: string, workspaceFolderName?: string): string {
         if (!relativePath) {return relativePath;}
         
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders || workspaceFolders.length === 0) {
             return relativePath;
         }
-
-        // Handle ${workspaceFolder:NAME} syntax
-        const namedMatch = relativePath.match(/\$\{workspaceFolder:([^}]+)\}/);
-        if (namedMatch) {
-            const folderName = namedMatch[1];
-            const folder = workspaceFolders.find(f => f.name === folderName);
-            if (folder) {
-                return relativePath
-                    .replace(/\$\{workspaceFolder:[^}]+\}/g, folder.uri.fsPath)
-                    .replace(/\//g, path.sep);
-            }
-        }
         
-        // Handle simple ${workspaceFolder} syntax (uses first workspace folder)
+        // Handle ${workspaceFolder} syntax
         if (relativePath.includes('${workspaceFolder}')) {
+            // Find the target workspace folder
+            let targetFolder = workspaceFolders[0];
+            if (workspaceFolderName) {
+                const found = workspaceFolders.find(f => f.name === workspaceFolderName);
+                if (found) {
+                    targetFolder = found;
+                }
+            }
+            
             return relativePath
-                .replace(/\$\{workspaceFolder\}/g, workspaceFolders[0].uri.fsPath)
+                .replace(/\$\{workspaceFolder\}/g, targetFolder.uri.fsPath)
                 .replace(/\//g, path.sep);
         }
         
@@ -230,27 +209,6 @@ export class AntTaskService {
     }
 
     /**
-     * Get the path to the ant-tasks.json file (stores custom metadata).
-     * @param workspaceFolderName Optional name of specific workspace folder (for multi-root)
-     */
-    private getAntTasksJsonPath(workspaceFolderName?: string): string | undefined {
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders || workspaceFolders.length === 0) {
-            return undefined;
-        }
-        
-        let targetFolder = workspaceFolders[0];
-        if (workspaceFolderName) {
-            const found = workspaceFolders.find(f => f.name === workspaceFolderName);
-            if (found) {
-                targetFolder = found;
-            }
-        }
-        
-        return path.join(targetFolder.uri.fsPath, '.vscode', 'ant-tasks.json');
-    }
-
-    /**
      * Read all tasks from tasks.json.
      * @param workspaceFolderName Optional name of specific workspace folder (for multi-root)
      */
@@ -269,99 +227,8 @@ export class AntTaskService {
     }
 
     /**
-     * Read Ant task metadata from ant-tasks.json.
-     * @param workspaceFolderName Optional name of specific workspace folder (for multi-root)
-     */
-    private readAntTasksJson(workspaceFolderName?: string): { version: string; tasks: { [label: string]: AntTaskMetadata } } {
-        const antTasksPath = this.getAntTasksJsonPath(workspaceFolderName);
-        if (!antTasksPath || !fs.existsSync(antTasksPath)) {
-            return { version: '1.0.0', tasks: {} };
-        }
-
-        try {
-            const content = fs.readFileSync(antTasksPath, 'utf8');
-            return JSON.parse(content);
-        } catch {
-            return { version: '1.0.0', tasks: {} };
-        }
-    }
-
-    /**
-     * Save Ant task metadata to ant-tasks.json.
-     * @param label Task label
-     * @param metadata Custom metadata to save
-     * @param workspaceFolderName Optional name of specific workspace folder (for multi-root)
-     */
-    private saveAntTaskMetadata(label: string, metadata: AntTaskMetadata, workspaceFolderName?: string): void {
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders || workspaceFolders.length === 0) {
-            return;
-        }
-
-        let targetFolder = workspaceFolders[0];
-        if (workspaceFolderName) {
-            const found = workspaceFolders.find(f => f.name === workspaceFolderName);
-            if (found) {
-                targetFolder = found;
-            }
-        }
-
-        const vscodeDir = path.join(targetFolder.uri.fsPath, '.vscode');
-        const antTasksPath = path.join(vscodeDir, 'ant-tasks.json');
-
-        // Ensure .vscode directory exists
-        if (!fs.existsSync(vscodeDir)) {
-            fs.mkdirSync(vscodeDir, { recursive: true });
-        }
-
-        const antTasksJson = this.readAntTasksJson(workspaceFolderName);
-        antTasksJson.tasks[label] = metadata;
-
-        fs.writeFileSync(antTasksPath, JSON.stringify(antTasksJson, null, 4), 'utf8');
-    }
-
-    /**
-     * Delete Ant task metadata from ant-tasks.json.
-     * @param label Task label to delete
-     * @param workspaceFolderName Optional name of specific workspace folder (for multi-root)
-     */
-    private deleteAntTaskMetadata(label: string, workspaceFolderName?: string): void {
-        const antTasksPath = this.getAntTasksJsonPath(workspaceFolderName);
-        if (!antTasksPath || !fs.existsSync(antTasksPath)) {
-            return;
-        }
-
-        const antTasksJson = this.readAntTasksJson(workspaceFolderName);
-        if (antTasksJson.tasks[label]) {
-            delete antTasksJson.tasks[label];
-            fs.writeFileSync(antTasksPath, JSON.stringify(antTasksJson, null, 4), 'utf8');
-        }
-    }
-
-    /**
-     * Rename task metadata in ant-tasks.json (when label changes).
-     * @param oldLabel Original task label
-     * @param newLabel New task label
-     * @param workspaceFolderName Optional name of specific workspace folder (for multi-root)
-     */
-    private renameAntTaskMetadata(oldLabel: string, newLabel: string, workspaceFolderName?: string): void {
-        const antTasksPath = this.getAntTasksJsonPath(workspaceFolderName);
-        if (!antTasksPath || !fs.existsSync(antTasksPath)) {
-            return;
-        }
-
-        const antTasksJson = this.readAntTasksJson(workspaceFolderName);
-        if (antTasksJson.tasks[oldLabel]) {
-            antTasksJson.tasks[newLabel] = antTasksJson.tasks[oldLabel];
-            delete antTasksJson.tasks[oldLabel];
-            fs.writeFileSync(antTasksPath, JSON.stringify(antTasksJson, null, 4), 'utf8');
-        }
-    }
-
-    /**
-     * Get all Ant-related tasks from all workspace folders' tasks.json files.
-     * In multi-root workspaces, this aggregates tasks from all folders.
-     * Merges custom metadata from ant-tasks.json.
+     * Get all Ant tasks from all workspace folders' tasks.json files.
+     * Extracts properties directly from standard VS Code task format.
      */
     getAntTasks(): AntTaskConfig[] {
         const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -373,25 +240,16 @@ export class AntTaskService {
         
         for (const folder of workspaceFolders) {
             const tasksJson = this.readTasksJson(folder.name);
-            const antTasksMetadata = this.readAntTasksJson(folder.name);
             const antTasks = tasksJson.tasks.filter(task => this.isAntTask(task));
             
-            // Add workspace folder info and merge metadata for each task
+            // Add workspace folder info and parse properties for each task
             for (const task of antTasks) {
                 // Store which workspace this task belongs to (for UI display and editing)
                 (task as any)._workspaceFolder = folder.name;
                 
-                // Merge custom metadata from ant-tasks.json
-                const metadata = antTasksMetadata.tasks[task.label];
-                if (metadata) {
-                    task.workingDirectory = metadata.workingDirectory;
-                    task.antHome = metadata.antHome;
-                    task.javaHome = metadata.javaHome;
-                    task.shell = metadata.shell;
-                    task.additionalArgs = metadata.additionalArgs;
-                }
-                
-                allTasks.push(task);
+                // Parse properties from standard task format
+                const parsed = this.parseAntTask(task);
+                allTasks.push(parsed);
             }
         }
         
@@ -412,8 +270,7 @@ export class AntTaskService {
     }
 
     /**
-     * Parse an Ant task to extract build file, targets, and additional arguments.
-     * Custom metadata should already be merged from ant-tasks.json by getAntTasks().
+     * Parse an Ant task to extract build file, targets, and settings from standard VS Code task properties.
      */
     parseAntTask(task: AntTaskConfig): AntTaskConfig {
         const parsed: AntTaskConfig = { ...task };
@@ -423,14 +280,11 @@ export class AntTaskService {
             (parsed as any)._workspaceFolder = (task as any)._workspaceFolder;
         }
         
-        // Use metadata from ant-tasks.json if available (already merged by getAntTasks)
-        // Fall back to extracting from options for backwards compatibility with existing tasks
-        parsed.workingDirectory = task.workingDirectory || task.options?.cwd || '';
-        parsed.antHome = task.antHome || task.options?.env?.ANT_HOME || '';
-        parsed.javaHome = task.javaHome || task.options?.env?.JAVA_HOME || '';
-        parsed.shell = task.shell || this.detectShellFromConfig(task);
-        // Get additionalArgs from metadata if available
-        const metadataAdditionalArgs = task.additionalArgs;
+        // Extract from standard VS Code task properties
+        parsed.workingDirectory = task.options?.cwd || '';
+        parsed.antHome = task.options?.env?.ANT_HOME || '';
+        parsed.javaHome = task.options?.env?.JAVA_HOME || '';
+        parsed.shell = task.options?.shell?.executable ? path.basename(task.options.shell.executable) : 'default';
 
         if (!task.args) {return parsed;}
 
@@ -439,8 +293,8 @@ export class AntTaskService {
         while (i < task.args.length) {
             const arg = task.args[i];
             if (arg === '-f' && i + 1 < task.args.length) {
-                // Resolve workspace-relative build file path
-                parsed.buildFile = this.resolveWorkspacePath(task.args[i + 1]);
+                // Keep build file path exactly as stored in args (don't resolve)
+                parsed.buildFile = task.args[i + 1];
                 i += 2;
             } else if (arg.startsWith('-')) {
                 // All arguments starting with - are additional args
@@ -453,9 +307,8 @@ export class AntTaskService {
             }
         }
         
-        // Use metadata additionalArgs if available, otherwise parse from args array
-        // This preserves the original formatting (newlines) from ant-tasks.json
-        parsed.additionalArgs = metadataAdditionalArgs || additionalArgsList.join('\n');
+        // Join additional args with newlines for display in UI
+        parsed.additionalArgs = additionalArgsList.join('\n');
 
         return parsed;
     }
@@ -575,7 +428,23 @@ export class AntTaskService {
         javaHome?: string,
         shell?: string
     ): AntTaskConfig {
-        // Resolve any ${workspaceFolder} paths first, then convert back to workspace-relative
+        // Determine the build file path to store in tasks.json
+        let relativeBuildFilePath: string;
+        
+        // If it already contains ${workspaceFolder}, keep it as-is
+        if (buildFilePath.includes('${workspaceFolder}')) {
+            relativeBuildFilePath = buildFilePath;
+        } 
+        // If it's a simple relative path (not absolute), keep it as-is (e.g., "build.xml", "../build.xml")
+        else if (!path.isAbsolute(buildFilePath)) {
+            relativeBuildFilePath = buildFilePath;
+        }
+        // Only convert absolute paths to workspace-relative
+        else {
+            relativeBuildFilePath = this.toWorkspaceRelativePath(buildFilePath);
+        }
+        
+        // Resolve for working directory calculation if needed
         const resolvedBuildFilePath = this.resolveWorkspacePath(buildFilePath);
         
         // For working directory, preserve VS Code variables if the user explicitly entered them
@@ -589,9 +458,6 @@ export class AntTaskService {
             const cwd = resolvedWorkingDir || path.dirname(resolvedBuildFilePath);
             relativeCwd = this.toWorkspaceRelativePath(cwd);
         }
-        
-        // Convert build file path to workspace-relative where possible
-        const relativeBuildFilePath = this.toWorkspaceRelativePath(resolvedBuildFilePath);
         
         // For the ant command, if ANT_HOME is set we add it to PATH, so just use 'ant'
         // This avoids issues with ${workspaceFolder} variables in the command path
@@ -719,16 +585,7 @@ export class AntTaskService {
             fs.mkdirSync(vscodeDir, { recursive: true });
         }
 
-        // Extract custom metadata before saving to tasks.json
-        const metadata: AntTaskMetadata = {
-            workingDirectory: taskConfig.workingDirectory,
-            antHome: taskConfig.antHome,
-            javaHome: taskConfig.javaHome,
-            shell: taskConfig.shell,
-            additionalArgs: taskConfig.additionalArgs
-        };
-
-        // Create a clean task config without custom properties for tasks.json
+        // Clean task config - remove UI-only properties
         const cleanTaskConfig = this.stripCustomProperties(taskConfig);
 
         const tasksJson = this.readTasksJson(workspaceFolderName);
@@ -742,27 +599,24 @@ export class AntTaskService {
             tasksJson.tasks.push(cleanTaskConfig);
         }
 
-        // Write tasks.json (clean, VS Code compatible)
+        // Write tasks.json
         fs.writeFileSync(tasksPath, JSON.stringify(tasksJson, null, 4), 'utf8');
-        
-        // Save custom metadata to ant-tasks.json
-        this.saveAntTaskMetadata(taskConfig.label, metadata, workspaceFolderName);
         
         vscode.window.showInformationMessage(`Ant task saved to ${targetFolder.name}/.vscode/tasks.json`);
     }
 
     /**
-     * Strip custom properties from task config for saving to tasks.json.
+     * Strip UI-only properties from task config for saving to tasks.json.
      */
     private stripCustomProperties(taskConfig: AntTaskConfig): AntTaskConfig {
         const clean = { ...taskConfig };
+        delete clean.buildFile;
+        delete clean.targets;
         delete clean.workingDirectory;
         delete clean.antHome;
         delete clean.javaHome;
         delete clean.shell;
         delete clean.additionalArgs;
-        delete clean.buildFile;
-        delete clean.targets;
         delete (clean as any)._workspaceFolder;
         return clean;
     }
@@ -779,16 +633,7 @@ export class AntTaskService {
             throw new Error('No workspace folder open');
         }
 
-        // Extract custom metadata before saving to tasks.json
-        const metadata: AntTaskMetadata = {
-            workingDirectory: taskConfig.workingDirectory,
-            antHome: taskConfig.antHome,
-            javaHome: taskConfig.javaHome,
-            shell: taskConfig.shell,
-            additionalArgs: taskConfig.additionalArgs
-        };
-
-        // Create a clean task config without custom properties for tasks.json
+        // Create a clean task config without UI-only properties for tasks.json
         const cleanTaskConfig = this.stripCustomProperties(taskConfig);
 
         const tasksJson = this.readTasksJson(workspaceFolderName);
@@ -800,13 +645,6 @@ export class AntTaskService {
 
         tasksJson.tasks[index] = cleanTaskConfig;
         fs.writeFileSync(tasksPath, JSON.stringify(tasksJson, null, 4), 'utf8');
-        
-        // Update metadata in ant-tasks.json
-        if (originalLabel !== taskConfig.label) {
-            // Label changed - rename the metadata entry
-            this.renameAntTaskMetadata(originalLabel, taskConfig.label, workspaceFolderName);
-        }
-        this.saveAntTaskMetadata(taskConfig.label, metadata, workspaceFolderName);
         
         vscode.window.showInformationMessage(`Task "${taskConfig.label}" updated`);
     }
@@ -831,9 +669,6 @@ export class AntTaskService {
 
         tasksJson.tasks.splice(index, 1);
         fs.writeFileSync(tasksPath, JSON.stringify(tasksJson, null, 4), 'utf8');
-        
-        // Also delete metadata from ant-tasks.json
-        this.deleteAntTaskMetadata(label, workspaceFolderName);
         
         vscode.window.showInformationMessage(`Task "${label}" deleted`);
     }
