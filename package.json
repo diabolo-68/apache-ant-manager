@@ -9,8 +9,16 @@
   },
   "license": "MIT",
   "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/diabolo-68/apache-ant-manager.git"
+  },
+  "bugs": {
+    "url": "https://github.com/diabolo-68/apache-ant-manager/issues"
+  },
+  "homepage": "https://github.com/diabolo-68/apache-ant-manager#readme",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.96.0"
   },
   "categories": [
     "Other"
