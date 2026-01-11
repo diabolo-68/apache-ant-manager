@@ -5,28 +5,12 @@ import { AntTaskService, AntTaskConfig } from '../services/AntTaskService';
 import { AntBuildInfo } from '../types/antTypes';
 
 /**
- * Form state to preserve user edits between re-renders.
- */
-interface FormState {
-    workspaceFolder?: string;
-    workingDirectory?: string;
-    buildFilePath?: string;
-    antHome?: string;
-    javaHome?: string;
-    shell?: string;
-    taskName?: string;
-    additionalArgs?: string;
-    selectedTargets?: string[];
-}
-
-/**
  * Edit mode for the configuration panel.
  */
 export interface EditContext {
     isEditMode: boolean;
     originalLabel?: string;
     task?: AntTaskConfig;
-    workspaceFolder?: string;
     onSaveComplete?: () => void;
 }
 
@@ -45,7 +29,6 @@ export class AntConfigurationPanel {
     private _buildFilePath: string;
     private _buildInfo: AntBuildInfo | undefined;
     private _editContext: EditContext;
-    private _formState: FormState = {};
     private _disposables: vscode.Disposable[] = [];
 
     public static createOrShow(
@@ -108,7 +91,10 @@ export class AntConfigurationPanel {
         this._buildFilePath = buildFilePath;
         this._editContext = editContext;
 
-        // Set the webview's initial html content
+        // Show loading state immediately
+        this._panel.webview.html = this._getLoadingHtml(panel.webview);
+
+        // Then parse and update
         this._update();
 
         // Listen for when the panel is disposed
@@ -120,10 +106,8 @@ export class AntConfigurationPanel {
                 switch (message.command) {
                     case 'saveTask':
                         try {
-                            // Pass the build file path as-is to preserve user's input format
-                            // (don't resolve it - generateTaskConfig will keep it exactly as entered)
                             const taskConfig = this._taskService.generateTaskConfig(
-                                message.buildFilePath,
+                                this._buildFilePath,
                                 message.targets,
                                 message.taskName,
                                 message.additionalArgs || '',
@@ -133,13 +117,10 @@ export class AntConfigurationPanel {
                                 message.shell
                             );
                             
-                            // Use the workspace folder selected by the user
-                            const targetWorkspaceFolder = message.workspaceFolder;
-                            
                             if (this._editContext.isEditMode && this._editContext.originalLabel) {
-                                await this._taskService.updateTask(this._editContext.originalLabel, taskConfig, targetWorkspaceFolder);
+                                await this._taskService.updateTask(this._editContext.originalLabel, taskConfig);
                             } else {
-                                await this._taskService.saveTaskToWorkspace(taskConfig, targetWorkspaceFolder);
+                                await this._taskService.saveTaskToWorkspace(taskConfig);
                             }
                             
                             // Notify callback if provided
@@ -193,56 +174,10 @@ export class AntConfigurationPanel {
                         }
                         break;
                     case 'refresh':
-                        // Store form state before refresh
-                        if (message.formState) {
-                            this._formState = message.formState;
-                            
-                            // Update build file path if it changed
-                            if (message.formState.buildFilePath) {
-                                const workspaceFolder = message.formState.workspaceFolder;
-                                let resolvedPath = this._taskService.resolveWorkspacePath(message.formState.buildFilePath, workspaceFolder);
-                                
-                                // If it's still a relative path, resolve it relative to working directory
-                                if (!path.isAbsolute(resolvedPath) && !resolvedPath.startsWith('${')) {
-                                    let workingDir = message.formState.workingDirectory || '';
-                                    if (workingDir) {
-                                        workingDir = this._taskService.resolveWorkspacePath(workingDir, workspaceFolder);
-                                        resolvedPath = path.resolve(workingDir, resolvedPath);
-                                    }
-                                }
-                                
-                                this._buildFilePath = resolvedPath;
-                            }
-                        }
                         this._parserService.clearCache(this._buildFilePath);
+                        // Show loading state while re-parsing
+                        this._panel.webview.html = this._getLoadingHtml(this._panel.webview);
                         await this._update();
-                        break;
-                    case 'updateBuildFilePath':
-                        // Store form state before update
-                        if (message.formState) {
-                            this._formState = message.formState;
-                        }
-                        
-                        // Resolve the build file path
-                        const workspaceFolder = message.formState?.workspaceFolder;
-                        let resolvedPath = message.path;
-                        
-                        // First try to resolve ${workspaceFolder} syntax with the selected workspace
-                        resolvedPath = this._taskService.resolveWorkspacePath(resolvedPath, workspaceFolder);
-                        
-                        // If it's still a relative path (not absolute and not starting with ${),
-                        // resolve it relative to the working directory
-                        if (!path.isAbsolute(resolvedPath) && !resolvedPath.startsWith('${')) {
-                            let workingDir = message.workingDirectory || '';
-                            if (workingDir) {
-                                workingDir = this._taskService.resolveWorkspacePath(workingDir, workspaceFolder);
-                                resolvedPath = path.resolve(workingDir, resolvedPath);
-                            }
-                        }
-                        
-                        if (resolvedPath !== this._buildFilePath) {
-                            await this.updateBuildFile(resolvedPath);
-                        }
                         break;
                 }
             },
@@ -253,19 +188,19 @@ export class AntConfigurationPanel {
 
     public async updateBuildFile(buildFilePath: string): Promise<void> {
         this._buildFilePath = buildFilePath;
+        // Show loading state while parsing
+        this._panel.webview.html = this._getLoadingHtml(this._panel.webview);
         await this._update();
     }
 
     private async _update(): Promise<void> {
-        // Show loading spinner immediately
-        this._panel.webview.html = this._getLoadingHtml(this._panel.webview);
-        
         try {
             this._buildInfo = await this._parserService.parseBuildFile(this._buildFilePath);
             const title = this._editContext.isEditMode ? 'Edit Ant Task' : 'New Ant Task';
             this._panel.title = title;
             this._panel.webview.html = this._getHtmlForWebview(this._panel.webview);
         } catch (error) {
+            this._panel.webview.html = this._getErrorHtml(this._panel.webview, `${error}`);
             vscode.window.showErrorMessage(`Failed to parse build file: ${error}`);
         }
     }
@@ -275,7 +210,6 @@ export class AntConfigurationPanel {
             vscode.Uri.joinPath(this._extensionUri, 'media', 'style.css')
         );
         const nonce = getNonce();
-        const title = this._editContext.isEditMode ? 'Edit Ant Task' : 'New Ant Task';
         
         return `<!DOCTYPE html>
 <html lang="en">
@@ -284,42 +218,37 @@ export class AntConfigurationPanel {
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="${styleUri}" rel="stylesheet">
-    <title>${title}</title>
-    <style nonce="${nonce}">
-        .loading-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 80vh;
-            gap: 20px;
-        }
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid var(--vscode-editor-foreground);
-            border-top-color: var(--vscode-button-background);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .loading-text {
-            color: var(--vscode-foreground);
-            font-size: 14px;
-        }
-    </style>
+    <title>Loading...</title>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🐜 ${title}</h1>
-        </header>
-        <div class="loading-container">
-            <div class="spinner"></div>
-            <div class="loading-text">Parsing Ant build file...</div>
-        </div>
+    <div class="loading-container">
+        <div class="spinner"></div>
+        <p>Parsing build file...</p>
+    </div>
+</body>
+</html>`;
+    }
+
+    private _getErrorHtml(webview: vscode.Webview, errorMessage: string): string {
+        const styleUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'media', 'style.css')
+        );
+        const nonce = getNonce();
+        
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="${styleUri}" rel="stylesheet">
+    <title>Error</title>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">⚠️</div>
+        <h2>Failed to parse build file</h2>
+        <p class="error-message">${escapeHtml(errorMessage)}</p>
     </div>
 </body>
 </html>`;
@@ -333,41 +262,21 @@ export class AntConfigurationPanel {
         const nonce = getNonce();
         const isEdit = this._editContext.isEditMode;
         const editTask = this._editContext.task;
+        const selectedTargets = editTask?.targets || [];
+        const additionalArgs = editTask?.additionalArgs || '';
+        const taskName = isEdit && editTask ? editTask.label : `Ant: ${this._buildInfo?.projectName || 'build'}`;
         
-        // Use form state values if available (preserves user edits), otherwise use edit task or defaults
-        const selectedTargets = this._formState.selectedTargets || editTask?.targets || [];
-        const additionalArgs = this._formState.additionalArgs ?? editTask?.additionalArgs ?? '';
-        const taskName = this._formState.taskName ?? (isEdit && editTask ? editTask.label : `Ant: ${this._buildInfo?.projectName || 'build'}`);
-        
-        // For editing, preserve original values from the task; for new tasks, calculate defaults
-        let workingDirectory: string;
-        let displayBuildFilePath: string;
-        
-        if (isEdit && editTask) {
-            // EDIT MODE: Preserve original values exactly as they are in the JSON
-            workingDirectory = this._formState.workingDirectory ?? editTask.workingDirectory ?? '';
-            displayBuildFilePath = this._formState.buildFilePath ?? editTask.buildFile ?? '';
-        } else {
-            // NEW TASK MODE: Calculate workspace-relative defaults
-            const defaultWorkingDir = path.dirname(this._buildFilePath);
-            workingDirectory = this._formState.workingDirectory ?? this._taskService.toWorkspaceRelativePath(defaultWorkingDir);
-            displayBuildFilePath = this._formState.buildFilePath ?? this._taskService.toWorkspaceRelativePath(this._buildFilePath);
-        }
-        
-        const antHome = this._formState.antHome ?? editTask?.antHome ?? '';
-        const javaHome = this._formState.javaHome ?? editTask?.javaHome ?? '';
-        const shell = this._formState.shell ?? editTask?.shell ?? 'default';
-        
-        // Multi-root workspace support
-        const isMultiRoot = this._taskService.isMultiRootWorkspace();
-        const workspaceFolders = this._taskService.getWorkspaceFolders();
-        const currentWorkspaceFolder = this._editContext.workspaceFolder || 
-            (this._editContext.task as any)?._workspaceFolder ||
-            (workspaceFolders.length > 0 ? workspaceFolders[0].name : '');
+        // Get path-related defaults
+        const defaultWorkingDir = path.dirname(this._buildFilePath);
+        const workingDirectory = editTask?.workingDirectory || defaultWorkingDir;
+        const antHome = editTask?.antHome || '';
+        const javaHome = editTask?.javaHome || '';
+        const shell = editTask?.shell || 'default';
 
         const buildInfo = this._buildInfo;
+        // Build the targets list (simple checkboxes)
         const targetsHtml = buildInfo?.targets.map(target => {
-            const isSelected = selectedTargets.includes(target.name) || (!isEdit && !this._formState.selectedTargets && target.isDefault);
+            const isSelected = selectedTargets.includes(target.name) || (!isEdit && target.isDefault);
             return `
             <div class="target-item" data-target="${escapeHtml(target.name)}">
                 <div class="target-checkbox">
@@ -382,12 +291,11 @@ export class AntConfigurationPanel {
                     ${target.description ? `<span class="target-description">${escapeHtml(target.description)}</span>` : ''}
                     ${target.dependencies.length > 0 ? `<span class="target-depends">Depends: ${target.dependencies.map(escapeHtml).join(', ')}</span>` : ''}
                 </div>
-                <div class="target-order">
-                    <button class="order-btn move-up" title="Move Up">▲</button>
-                    <button class="order-btn move-down" title="Move Down">▼</button>
-                </div>
             </div>
         `;}).join('') || '<p>No targets found</p>';
+
+        // Pre-compute initial selected targets in order for edit mode
+        const initialSelectedJson = JSON.stringify(selectedTargets);
 
         return `<!DOCTYPE html>
 <html lang="en">
@@ -404,44 +312,12 @@ export class AntConfigurationPanel {
             <h1>🐜 ${isEdit ? 'Edit' : 'New'} Ant Task</h1>
         </header>
 
-        ${isMultiRoot ? `
-        <section class="workspace-section">
-            <h2>Target Workspace</h2>
-            <p class="help-text">Select which project's tasks.json file to save this task to.</p>
-            <div class="env-row">
-                <label for="workspaceFolder">Save to Project:</label>
-                <select id="workspaceFolder">
-                    ${workspaceFolders.map(f => 
-                        `<option value="${escapeHtml(f.name)}" ${f.name === currentWorkspaceFolder ? 'selected' : ''}>${escapeHtml(f.name)}</option>`
-                    ).join('')}
-                </select>
-            </div>
-        </section>
-        ` : ''}
-
-        <section class="working-dir-section">
-            <h2>Working Directory</h2>
-            <p class="help-text">Base directory for Ant execution. Relative build file paths will be resolved from here.</p>
-            <div class="env-row">
-                <label for="workingDirectory">Directory:</label>
-                <div class="input-with-browse">
-                    <input type="text" id="workingDirectory" value="${escapeHtml(workingDirectory)}" placeholder="Working directory for Ant execution">
-                    <button class="browse-btn" data-target="workingDirectory" title="Browse...">📁</button>
-                </div>
-            </div>
-        </section>
-
         <section class="build-file-section">
             <h2>Build File</h2>
-            <p class="help-text">Path to build.xml. Can be absolute, workspace-relative (\${workspaceFolder}/...), or relative to working directory.</p>
-            <div class="env-row">
-                <label for="buildFilePath">File:</label>
-                <div class="input-with-browse">
-                    <input type="text" id="buildFilePath" value="${escapeHtml(displayBuildFilePath)}" 
-                           placeholder="Path to build.xml">
-                    <button id="browseBuildFile" class="browse-btn" title="Browse...">📁</button>
-                    <button id="refreshBtn" title="Refresh">🔄</button>
-                </div>
+            <div class="build-file-row">
+                <input type="text" id="buildFilePath" value="${escapeHtml(this._buildFilePath)}" readonly>
+                <button id="browseBuildFile">Browse...</button>
+                <button id="refreshBtn" title="Refresh">🔄</button>
             </div>
             ${buildInfo ? `
                 <div class="project-info">
@@ -453,6 +329,13 @@ export class AntConfigurationPanel {
 
         <section class="environment-section">
             <h2>Environment Settings</h2>
+            <div class="env-row">
+                <label for="workingDirectory">Working Directory:</label>
+                <div class="input-with-browse">
+                    <input type="text" id="workingDirectory" value="${escapeHtml(workingDirectory)}" placeholder="Working directory for Ant execution">
+                    <button class="browse-btn" data-target="workingDirectory" title="Browse...">📁</button>
+                </div>
+            </div>
             <div class="env-row">
                 <label for="antHome">ANT_HOME:</label>
                 <div class="input-with-browse">
@@ -482,16 +365,17 @@ export class AntConfigurationPanel {
         </section>
 
         <section class="targets-section">
-            <h2>Targets</h2>
-            <p class="help-text">Select targets to run and use arrows to define execution order.</p>
+            <h2>Available Targets</h2>
+            <p class="help-text">Check the targets you want to include in this task.</p>
             <div class="targets-list" id="targetsList">
                 ${targetsHtml}
             </div>
         </section>
 
         <section class="selected-section">
-            <h2>Selected Targets Order</h2>
-            <div id="selectedOrder" class="selected-order"></div>
+            <h2>Execution Order</h2>
+            <p class="help-text">Use the arrows to reorder selected targets. Targets will run from top to bottom.</p>
+            <div id="selectedOrder" class="selected-order-list"></div>
         </section>
 
         <section class="arguments-section">
@@ -520,63 +404,75 @@ export class AntConfigurationPanel {
     <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
         
-        // Update selected order display
-        function updateSelectedOrder() {
-            const checkboxes = document.querySelectorAll('.target-item input[type="checkbox"]:checked');
+        // Track selected targets in order
+        let selectedTargetsOrder = ${initialSelectedJson};
+
+        // Render the selected targets list with reorder buttons
+        function renderSelectedOrder() {
             const orderDiv = document.getElementById('selectedOrder');
-            const names = Array.from(checkboxes).map(cb => cb.value);
             
-            if (names.length === 0) {
-                orderDiv.innerHTML = '<span class="no-selection">No targets selected</span>';
-            } else {
-                orderDiv.innerHTML = names.map((name, i) => 
-                    '<span class="order-tag">' + (i + 1) + '. ' + name + '</span>'
-                ).join(' → ');
+            if (selectedTargetsOrder.length === 0) {
+                orderDiv.innerHTML = '<div class="no-selection">No targets selected</div>';
+                return;
             }
+            
+            orderDiv.innerHTML = selectedTargetsOrder.map((name, i) => 
+                '<div class="selected-target-item" data-target="' + name + '">' +
+                    '<span class="order-number">' + (i + 1) + '</span>' +
+                    '<span class="order-name">' + name + '</span>' +
+                    '<div class="order-buttons">' +
+                        '<button class="order-btn order-up" title="Move Up" ' + (i === 0 ? 'disabled' : '') + '>▲</button>' +
+                        '<button class="order-btn order-down" title="Move Down" ' + (i === selectedTargetsOrder.length - 1 ? 'disabled' : '') + '>▼</button>' +
+                    '</div>' +
+                '</div>'
+            ).join('');
+            
+            // Attach event listeners to the new buttons
+            orderDiv.querySelectorAll('.order-up').forEach((btn, idx) => {
+                btn.addEventListener('click', () => moveTarget(idx, -1));
+            });
+            orderDiv.querySelectorAll('.order-down').forEach((btn, idx) => {
+                btn.addEventListener('click', () => moveTarget(idx, 1));
+            });
+        }
+
+        // Move a target up or down in the order
+        function moveTarget(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= selectedTargetsOrder.length) return;
+            
+            const temp = selectedTargetsOrder[index];
+            selectedTargetsOrder[index] = selectedTargetsOrder[newIndex];
+            selectedTargetsOrder[newIndex] = temp;
+            renderSelectedOrder();
+        }
+
+        // Handle checkbox changes - add/remove from selected order
+        function handleCheckboxChange(e) {
+            const targetName = e.target.value;
+            if (e.target.checked) {
+                // Add to end of selected list if not already there
+                if (!selectedTargetsOrder.includes(targetName)) {
+                    selectedTargetsOrder.push(targetName);
+                }
+            } else {
+                // Remove from selected list
+                selectedTargetsOrder = selectedTargetsOrder.filter(t => t !== targetName);
+            }
+            renderSelectedOrder();
         }
 
         // Initialize
-        updateSelectedOrder();
+        renderSelectedOrder();
 
-        // Handle checkbox changes
+        // Attach checkbox listeners
         document.querySelectorAll('.target-item input[type="checkbox"]').forEach(cb => {
-            cb.addEventListener('change', updateSelectedOrder);
-        });
-
-        // Handle move up/down buttons
-        document.querySelectorAll('.move-up').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const item = e.target.closest('.target-item');
-                const prev = item.previousElementSibling;
-                if (prev) {
-                    item.parentNode.insertBefore(item, prev);
-                    updateSelectedOrder();
-                }
-            });
-        });
-
-        document.querySelectorAll('.move-down').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const item = e.target.closest('.target-item');
-                const next = item.nextElementSibling;
-                if (next) {
-                    item.parentNode.insertBefore(next, item);
-                    updateSelectedOrder();
-                }
-            });
+            cb.addEventListener('change', handleCheckboxChange);
         });
 
         // Get selected targets in order
         function getSelectedTargets() {
-            const items = document.querySelectorAll('.target-item');
-            const targets = [];
-            items.forEach(item => {
-                const cb = item.querySelector('input[type="checkbox"]');
-                if (cb && cb.checked) {
-                    targets.push(cb.value);
-                }
-            });
-            return targets;
+            return selectedTargetsOrder;
         }
 
         // Get additional arguments
@@ -607,16 +503,10 @@ export class AntConfigurationPanel {
                 return;
             }
             const env = getEnvironmentSettings();
-            const buildFilePath = document.getElementById('buildFilePath').value.trim();
-            const workspaceFolderSelect = document.getElementById('workspaceFolder');
-            const workspaceFolder = workspaceFolderSelect ? workspaceFolderSelect.value : undefined;
-            
             vscode.postMessage({ 
                 command: 'saveTask', 
                 targets, 
                 taskName,
-                buildFilePath,
-                workspaceFolder,
                 additionalArgs: getAdditionalArgs(),
                 workingDirectory: env.workingDirectory,
                 antHome: env.antHome,
@@ -649,50 +539,9 @@ export class AntConfigurationPanel {
             }
         });
 
-        // Get current form state to preserve user edits during refresh
-        function getFormState() {
-            const workspaceFolderSelect = document.getElementById('workspaceFolder');
-            return {
-                workspaceFolder: workspaceFolderSelect ? workspaceFolderSelect.value : undefined,
-                workingDirectory: document.getElementById('workingDirectory').value,
-                buildFilePath: document.getElementById('buildFilePath').value,
-                antHome: document.getElementById('antHome').value,
-                javaHome: document.getElementById('javaHome').value,
-                shell: document.getElementById('shell').value,
-                taskName: document.getElementById('taskName').value,
-                additionalArgs: document.getElementById('additionalArgs').value,
-                selectedTargets: getSelectedTargets()
-            };
-        }
-
         // Refresh button
         document.getElementById('refreshBtn').addEventListener('click', () => {
-            vscode.postMessage({ command: 'refresh', formState: getFormState() });
-        });
-
-        // Build file path change handler - reparse on blur or Enter
-        const buildFileInput = document.getElementById('buildFilePath');
-        let lastBuildFilePath = buildFileInput.value;
-        
-        buildFileInput.addEventListener('blur', () => {
-            const newPath = buildFileInput.value.trim();
-            if (newPath && newPath !== lastBuildFilePath) {
-                lastBuildFilePath = newPath;
-                const workingDir = document.getElementById('workingDirectory').value.trim();
-                vscode.postMessage({ 
-                    command: 'updateBuildFilePath', 
-                    path: newPath, 
-                    workingDirectory: workingDir,
-                    formState: getFormState()
-                });
-            }
-        });
-        
-        buildFileInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                buildFileInput.blur();
-            }
+            vscode.postMessage({ command: 'refresh' });
         });
     </script>
 </body>

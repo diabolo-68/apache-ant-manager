@@ -29,6 +29,63 @@ body {
     padding: 0;
 }
 
+/* Loading Spinner */
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    gap: 20px;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--button-background);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-container p {
+    color: var(--vscode-descriptionForeground);
+    margin: 0;
+}
+
+/* Error State */
+.error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    gap: 10px;
+    padding: 20px;
+    text-align: center;
+}
+
+.error-icon {
+    font-size: 48px;
+}
+
+.error-container h2 {
+    margin: 0;
+    color: var(--vscode-errorForeground);
+}
+
+.error-message {
+    color: var(--vscode-descriptionForeground);
+    max-width: 500px;
+    word-wrap: break-word;
+}
+
 .container {
     max-width: 800px;
     margin: 0 auto;
@@ -170,6 +227,63 @@ section {
 }
 
 /* Selected Order Section */
+.selected-order-list {
+    min-height: 60px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--input-background);
+}
+
+.selected-target-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    transition: background-color 0.1s;
+}
+
+.selected-target-item:last-child {
+    border-bottom: none;
+}
+
+.selected-target-item:hover {
+    background: var(--list-hover);
+}
+
+.order-number {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--button-background);
+    color: var(--button-foreground);
+    border-radius: 50%;
+    font-size: 0.85em;
+    font-weight: 500;
+    margin-right: 12px;
+}
+
+.order-name {
+    flex: 1;
+    font-weight: 500;
+}
+
+.order-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.order-buttons .order-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+}
+
+.order-buttons .order-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
 .selected-order {
     display: flex;
     flex-wrap: wrap;
@@ -192,6 +306,8 @@ section {
 .no-selection {
     color: var(--vscode-descriptionForeground);
     font-style: italic;
+    padding: 15px;
+    text-align: center;
 }
 
 /* Properties Section */

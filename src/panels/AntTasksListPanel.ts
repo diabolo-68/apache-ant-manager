@@ -92,10 +92,7 @@ export class AntTasksListPanel {
                         break;
                     case 'editTask':
                         const tasks = this._taskService.getAntTasks();
-                        const taskToEdit = tasks.find(t => 
-                            t.label === message.label && 
-                            (t as any)._workspaceFolder === message.workspaceFolder
-                        );
+                        const taskToEdit = tasks.find(t => t.label === message.label);
                         if (taskToEdit && this._onEditTask) {
                             const parsed = this._taskService.parseAntTask(taskToEdit);
                             this._onEditTask(parsed, false);
@@ -109,7 +106,7 @@ export class AntTasksListPanel {
                         );
                         if (confirm === 'Delete') {
                             try {
-                                await this._taskService.deleteTask(message.label, message.workspaceFolder);
+                                await this._taskService.deleteTask(message.label);
                                 this.refresh();
                             } catch (error) {
                                 vscode.window.showErrorMessage(`Failed to delete task: ${error}`);
@@ -118,7 +115,7 @@ export class AntTasksListPanel {
                         break;
                     case 'runTask':
                         // Run the saved task from tasks.json by its label
-                        await this._taskService.runSavedTask(message.label, message.workspaceFolder);
+                        await this._taskService.runSavedTask(message.label);
                         break;
                     case 'refresh':
                         this.refresh();
@@ -146,25 +143,22 @@ export class AntTasksListPanel {
         const nonce = getNonce();
 
         const tasks = this._taskService.getAntTasks();
-        const isMultiRoot = this._taskService.isMultiRootWorkspace();
         const tasksHtml = tasks.length > 0 
             ? tasks.map(task => {
                 const parsed = this._taskService.parseAntTask(task);
-                const workspaceFolder = (task as any)._workspaceFolder || '';
                 return `
-                    <div class="task-item" data-label="${escapeHtml(task.label)}" data-workspace="${escapeHtml(workspaceFolder)}">
+                    <div class="task-item" data-label="${escapeHtml(task.label)}">
                         <div class="task-info">
                             <div class="task-name">${escapeHtml(task.label)}</div>
                             <div class="task-details">
-                                ${isMultiRoot ? `<span class="task-workspace">📁 ${escapeHtml(workspaceFolder)}</span>` : ''}
                                 <span class="task-buildfile">📄 ${escapeHtml(parsed.buildFile || 'Unknown')}</span>
                                 <span class="task-targets">🎯 ${parsed.targets?.map(escapeHtml).join(', ') || 'No targets'}</span>
                             </div>
                         </div>
                         <div class="task-actions">
-                            <button class="action-btn run-btn" data-label="${escapeHtml(task.label)}" data-workspace="${escapeHtml(workspaceFolder)}" title="Run">▶</button>
-                            <button class="action-btn edit-btn" data-label="${escapeHtml(task.label)}" data-workspace="${escapeHtml(workspaceFolder)}" title="Edit">✏️</button>
-                            <button class="action-btn delete-btn" data-label="${escapeHtml(task.label)}" data-workspace="${escapeHtml(workspaceFolder)}" title="Delete">🗑️</button>
+                            <button class="action-btn run-btn" data-label="${escapeHtml(task.label)}" title="Run">▶</button>
+                            <button class="action-btn edit-btn" data-label="${escapeHtml(task.label)}" title="Edit">✏️</button>
+                            <button class="action-btn delete-btn" data-label="${escapeHtml(task.label)}" title="Delete">🗑️</button>
                         </div>
                     </div>
                 `;
@@ -283,8 +277,7 @@ export class AntTasksListPanel {
         document.querySelectorAll('.edit-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const label = e.target.getAttribute('data-label');
-                const workspace = e.target.getAttribute('data-workspace');
-                vscode.postMessage({ command: 'editTask', label, workspaceFolder: workspace });
+                vscode.postMessage({ command: 'editTask', label });
             });
         });
 
@@ -292,8 +285,7 @@ export class AntTasksListPanel {
         document.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const label = e.target.getAttribute('data-label');
-                const workspace = e.target.getAttribute('data-workspace');
-                vscode.postMessage({ command: 'deleteTask', label, workspaceFolder: workspace });
+                vscode.postMessage({ command: 'deleteTask', label });
             });
         });
 
@@ -301,8 +293,7 @@ export class AntTasksListPanel {
         document.querySelectorAll('.run-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const label = e.target.getAttribute('data-label');
-                const workspace = e.target.getAttribute('data-workspace');
-                vscode.postMessage({ command: 'runTask', label, workspaceFolder: workspace });
+                vscode.postMessage({ command: 'runTask', label });
             });
         });
     </script>

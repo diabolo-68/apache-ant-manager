@@ -68,17 +68,14 @@ export function activate(context: vscode.ExtensionContext) {
             // Edit existing task
             const rawBuildFilePath = task.buildFile || '';
             
-            // Get workspace folder from the task (set by getAntTasks)
-            const taskWorkspaceFolder = (task as any)._workspaceFolder;
-            
-            // Resolve the build file path the same way as the refresh button
-            let buildFilePath = taskService.resolveWorkspacePath(rawBuildFilePath, taskWorkspaceFolder);
+            // Resolve the build file path
+            let buildFilePath = taskService.resolveWorkspacePath(rawBuildFilePath);
             
             // If it's still a relative path, resolve it relative to working directory
             if (!path.isAbsolute(buildFilePath) && !buildFilePath.startsWith('${')) {
                 let workingDir = task.workingDirectory || '';
                 if (workingDir) {
-                    workingDir = taskService.resolveWorkspacePath(workingDir, taskWorkspaceFolder);
+                    workingDir = taskService.resolveWorkspacePath(workingDir);
                     buildFilePath = path.resolve(workingDir, buildFilePath);
                 }
             }
@@ -87,7 +84,6 @@ export function activate(context: vscode.ExtensionContext) {
                 isEditMode: true,
                 originalLabel: task.label,
                 task: task,
-                workspaceFolder: taskWorkspaceFolder,
                 onSaveComplete: () => {
                     AntTasksListPanel.currentPanel?.refresh();
                 }
