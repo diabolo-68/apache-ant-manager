@@ -151,12 +151,47 @@ section {
 }
 
 .targets-list {
-    max-height: 300px;
+    max-height: 250px;
     overflow-y: auto;
     border: 1px solid var(--border);
     border-radius: 3px;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 4px;
 }
 
+/* Compact target checkbox */
+.target-compact {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.9em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.target-compact:hover {
+    background: var(--list-hover);
+}
+
+.target-compact input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    cursor: pointer;
+}
+
+.target-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Legacy target-item styles (kept for compatibility) */
 .target-item {
     display: flex;
     align-items: center;

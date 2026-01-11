@@ -42,19 +42,27 @@ export class AntParserService {
             return cached.info;
         }
 
-        // Try Java parser first, fall back to XML parsing
-        try {
-            console.log('Parsing script with Java Ant Parser');
-            const buildInfo = await this.parseWithJava(buildFilePath);
-            this.cache.set(buildFilePath, { info: buildInfo, timestamp: Date.now() });
-            console.log('Ant script parsed with the Java Ant Parser');
-            return buildInfo;
-        } catch (error) {
-            console.warn('Java parser failed, falling back to XML parsing:', error);
-            const buildInfo = await this.parseWithXml(buildFilePath);
-            this.cache.set(buildFilePath, { info: buildInfo, timestamp: Date.now() });
-            return buildInfo;
+        const config = vscode.workspace.getConfiguration('apacheAntManager');
+        const useJavaParser = config.get<boolean>('useJavaParser') ?? false;
+
+        // Use Java parser only if explicitly configured
+        if (useJavaParser) {
+            try {
+                console.log('Parsing script with Java Ant Parser');
+                const buildInfo = await this.parseWithJava(buildFilePath);
+                this.cache.set(buildFilePath, { info: buildInfo, timestamp: Date.now() });
+                console.log('Ant script parsed with the Java Ant Parser');
+                return buildInfo;
+            } catch (error) {
+                console.warn('Java parser failed, falling back to XML parsing:', error);
+            }
         }
+
+        // Use fast XML parser (default)
+        console.log('Parsing script with XML Parser');
+        const buildInfo = await this.parseWithXml(buildFilePath);
+        this.cache.set(buildFilePath, { info: buildInfo, timestamp: Date.now() });
+        return buildInfo;
     }
 
     /**
@@ -129,6 +137,8 @@ export class AntParserService {
      */
     private async parseWithXml(buildFilePath: string): Promise<AntBuildInfo> {
         const fs = require('fs').promises;
+        const config = vscode.workspace.getConfiguration('apacheAntManager');
+        const maxDepth = config.get<number>('importDepth') ?? 2;
         
         const buildInfo: AntBuildInfo = {
             projectName: '',
@@ -142,8 +152,8 @@ export class AntParserService {
         // Track processed files to avoid circular imports
         const processedFiles = new Set<string>();
         
-        // Parse the main file and follow imports
-        await this.parseXmlFile(buildFilePath, buildInfo, processedFiles, fs);
+        // Parse the main file and follow imports up to maxDepth
+        await this.parseXmlFile(buildFilePath, buildInfo, processedFiles, fs, 0, maxDepth);
 
         // Sort targets alphabetically
         buildInfo.targets.sort((a, b) => a.name.localeCompare(b.name));
@@ -154,12 +164,16 @@ export class AntParserService {
     /**
      * Parse a single XML file and recursively follow imports/includes.
      * This is a fallback solution in case the Java parser failed.
+     * @param currentDepth Current depth level (0 = main file)
+     * @param maxDepth Maximum depth to follow imports
      */
     private async parseXmlFile(
         filePath: string, 
         buildInfo: AntBuildInfo, 
         processedFiles: Set<string>,
-        fs: any
+        fs: any,
+        currentDepth: number,
+        maxDepth: number
     ): Promise<void> {
         // Normalize path and check if already processed
         const normalizedPath = path.resolve(filePath);
@@ -225,24 +239,26 @@ export class AntParserService {
             }
         }
 
-        // Find and process imports and includes
-        const importRegex = /<(?:import|include)\s+([^>]*)\/?>/gi;
-        let importMatch;
+        // Find and process imports and includes (only if we haven't reached max depth)
+        if (currentDepth < maxDepth) {
+            const importRegex = /<(?:import|include)\s+([^>]*)\/?>/gi;
+            let importMatch;
 
-        while ((importMatch = importRegex.exec(content)) !== null) {
-            const attrs = importMatch[1];
-            const fileAttrMatch = attrs.match(/file\s*=\s*["']([^"']*)["']/i);
-            
-            if (fileAttrMatch) {
-                let importPath = fileAttrMatch[1];
+            while ((importMatch = importRegex.exec(content)) !== null) {
+                const attrs = importMatch[1];
+                const fileAttrMatch = attrs.match(/file\s*=\s*["']([^"']*)["']/i);
                 
-                // Resolve relative paths
-                if (!path.isAbsolute(importPath)) {
-                    importPath = path.resolve(fileDir, importPath);
-                }
+                if (fileAttrMatch) {
+                    let importPath = fileAttrMatch[1];
+                    
+                    // Resolve relative paths
+                    if (!path.isAbsolute(importPath)) {
+                        importPath = path.resolve(fileDir, importPath);
+                    }
 
-                // Recursively parse the imported file
-                await this.parseXmlFile(importPath, buildInfo, processedFiles, fs);
+                    // Recursively parse the imported file with incremented depth
+                    await this.parseXmlFile(importPath, buildInfo, processedFiles, fs, currentDepth + 1, maxDepth);
+                }
             }
         }
     }

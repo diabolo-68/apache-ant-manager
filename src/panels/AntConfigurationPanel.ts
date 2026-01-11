@@ -117,10 +117,29 @@ export class AntConfigurationPanel {
                                 message.shell
                             );
                             
+                            // Find the workspace folder by name (or null for workspace-level)
+                            const workspaceFolders = vscode.workspace.workspaceFolders || [];
+                            const saveToWorkspaceFile = message.workspaceFolderName === '__workspace__';
+                            const targetFolder = saveToWorkspaceFile 
+                                ? null 
+                                : workspaceFolders.find(f => f.name === message.workspaceFolderName);
+                            
                             if (this._editContext.isEditMode && this._editContext.originalLabel) {
-                                await this._taskService.updateTask(this._editContext.originalLabel, taskConfig);
+                                // When editing, we need to know the source location to handle moving
+                                const editTask = this._editContext.task;
+                                const sourceIsWorkspaceLevel = editTask ? (editTask as any)._isWorkspaceLevel : false;
+                                const sourceFolder = sourceIsWorkspaceLevel 
+                                    ? '__workspace__' 
+                                    : (editTask ? (editTask as any)._workspaceFolder : undefined);
+                                
+                                await this._taskService.updateTask(
+                                    this._editContext.originalLabel, 
+                                    taskConfig, 
+                                    targetFolder,
+                                    sourceFolder
+                                );
                             } else {
-                                await this._taskService.saveTaskToWorkspace(taskConfig);
+                                await this._taskService.saveTaskToWorkspace(taskConfig, targetFolder || undefined, saveToWorkspaceFile);
                             }
                             
                             // Notify callback if provided
@@ -266,6 +285,21 @@ export class AntConfigurationPanel {
         const additionalArgs = editTask?.additionalArgs || '';
         const taskName = isEdit && editTask ? editTask.label : `Ant: ${this._buildInfo?.projectName || 'build'}`;
         
+        // Get workspace folders for the dropdown
+        const workspaceFolders = vscode.workspace.workspaceFolders || [];
+        const defaultFolder = this._taskService.getWorkspaceFolderForFile(this._buildFilePath);
+        const editTaskFolder = editTask ? (editTask as any)._workspaceFolder : undefined;
+        const editIsWorkspaceLevel = editTask ? (editTask as any)._isWorkspaceLevel : false;
+        const isMultiRootWorkspace = this._taskService.isMultiRootWorkspace();
+        
+        // Determine the selected folder name - use __workspace__ for workspace-level tasks
+        let selectedFolderName: string;
+        if (editIsWorkspaceLevel) {
+            selectedFolderName = '__workspace__';
+        } else {
+            selectedFolderName = editTaskFolder?.name || defaultFolder?.name || (workspaceFolders[0]?.name || '');
+        }
+        
         // Get path-related defaults
         const defaultWorkingDir = path.dirname(this._buildFilePath);
         const workingDirectory = editTask?.workingDirectory || defaultWorkingDir;
@@ -274,24 +308,15 @@ export class AntConfigurationPanel {
         const shell = editTask?.shell || 'default';
 
         const buildInfo = this._buildInfo;
-        // Build the targets list (simple checkboxes)
+        // Build the targets list (compact checkboxes)
         const targetsHtml = buildInfo?.targets.map(target => {
             const isSelected = selectedTargets.includes(target.name) || (!isEdit && target.isDefault);
+            const tooltip = [target.description, target.dependencies.length > 0 ? `Depends: ${target.dependencies.join(', ')}` : ''].filter(Boolean).join(' | ');
             return `
-            <div class="target-item" data-target="${escapeHtml(target.name)}">
-                <div class="target-checkbox">
-                    <input type="checkbox" id="target-${escapeHtml(target.name)}" 
-                           value="${escapeHtml(target.name)}"
-                           ${isSelected ? 'checked' : ''}>
-                </div>
-                <div class="target-info">
-                    <label for="target-${escapeHtml(target.name)}" class="target-name">
-                        ${target.isDefault ? '⭐ ' : ''}${escapeHtml(target.name)}
-                    </label>
-                    ${target.description ? `<span class="target-description">${escapeHtml(target.description)}</span>` : ''}
-                    ${target.dependencies.length > 0 ? `<span class="target-depends">Depends: ${target.dependencies.map(escapeHtml).join(', ')}</span>` : ''}
-                </div>
-            </div>
+            <label class="target-compact" title="${escapeHtml(tooltip)}">
+                <input type="checkbox" value="${escapeHtml(target.name)}" ${isSelected ? 'checked' : ''}>
+                <span class="target-label">${target.isDefault ? '⭐' : ''}${escapeHtml(target.name)}</span>
+            </label>
         `;}).join('') || '<p>No targets found</p>';
 
         // Pre-compute initial selected targets in order for edit mode
@@ -325,6 +350,32 @@ export class AntConfigurationPanel {
                     <span><strong>Default Target:</strong> ${escapeHtml(buildInfo.defaultTarget || 'None')}</span>
                 </div>
             ` : ''}
+        </section>
+
+        <section class="task-name-section">
+            <h2>Task Configuration</h2>
+            <div class="task-name-row">
+                <label for="taskName">Task Name:</label>
+                <input type="text" id="taskName" placeholder="e.g., Build Project" 
+                       value="${escapeHtml(taskName)}">
+            </div>
+            ${workspaceFolders.length > 1 || isMultiRootWorkspace ? `
+            <div class="task-name-row" style="margin-top: 12px;">
+                <label for="workspaceFolder">Save to:</label>
+                <select id="workspaceFolder">
+                    ${workspaceFolders.map(folder => `
+                        <option value="${escapeHtml(folder.name)}" ${folder.name === selectedFolderName ? 'selected' : ''}>
+                            📁 ${escapeHtml(folder.name)}
+                        </option>
+                    `).join('')}
+                    ${isMultiRootWorkspace ? `
+                    <option value="__workspace__" ${selectedFolderName === '__workspace__' ? 'selected' : ''}>
+                        🗂️ Workspace (shared)
+                    </option>
+                    ` : ''}
+                </select>
+            </div>
+            ` : `<input type="hidden" id="workspaceFolder" value="${escapeHtml(selectedFolderName)}">`}
         </section>
 
         <section class="environment-section">
@@ -384,15 +435,6 @@ export class AntConfigurationPanel {
             <textarea id="additionalArgs" rows="4" placeholder="-Dproperty=value
 -verbose
 -debug">${escapeHtml(additionalArgs)}</textarea>
-        </section>
-
-        <section class="task-name-section">
-            <h2>Task Configuration</h2>
-            <div class="task-name-row">
-                <label for="taskName">Task Name:</label>
-                <input type="text" id="taskName" placeholder="e.g., Build Project" 
-                       value="${escapeHtml(taskName)}">
-            </div>
         </section>
 
         <footer class="actions">
@@ -466,7 +508,7 @@ export class AntConfigurationPanel {
         renderSelectedOrder();
 
         // Attach checkbox listeners
-        document.querySelectorAll('.target-item input[type="checkbox"]').forEach(cb => {
+        document.querySelectorAll('.target-compact input[type="checkbox"]').forEach(cb => {
             cb.addEventListener('change', handleCheckboxChange);
         });
 
@@ -503,6 +545,7 @@ export class AntConfigurationPanel {
                 return;
             }
             const env = getEnvironmentSettings();
+            const workspaceFolderName = document.getElementById('workspaceFolder').value;
             vscode.postMessage({ 
                 command: 'saveTask', 
                 targets, 
@@ -511,7 +554,8 @@ export class AntConfigurationPanel {
                 workingDirectory: env.workingDirectory,
                 antHome: env.antHome,
                 javaHome: env.javaHome,
-                shell: env.shell
+                shell: env.shell,
+                workspaceFolderName: workspaceFolderName
             });
         });
 

@@ -95,6 +95,10 @@ export class AntTasksListPanel {
                         const taskToEdit = tasks.find(t => t.label === message.label);
                         if (taskToEdit && this._onEditTask) {
                             const parsed = this._taskService.parseAntTask(taskToEdit);
+                            // Preserve the workspace folder info for editing
+                            (parsed as any)._workspaceFolder = (taskToEdit as any)._workspaceFolder;
+                            (parsed as any)._workspaceFolderName = (taskToEdit as any)._workspaceFolderName;
+                            (parsed as any)._isWorkspaceLevel = (taskToEdit as any)._isWorkspaceLevel;
                             this._onEditTask(parsed, false);
                         }
                         break;
@@ -106,7 +110,8 @@ export class AntTasksListPanel {
                         );
                         if (confirm === 'Delete') {
                             try {
-                                await this._taskService.deleteTask(message.label);
+                                // Pass the folder name to correctly locate the task
+                                await this._taskService.deleteTask(message.label, message.folderName);
                                 this.refresh();
                             } catch (error) {
                                 vscode.window.showErrorMessage(`Failed to delete task: ${error}`);
@@ -143,13 +148,20 @@ export class AntTasksListPanel {
         const nonce = getNonce();
 
         const tasks = this._taskService.getAntTasks();
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        const isMultiRoot = (workspaceFolders && workspaceFolders.length > 1) || this._taskService.isMultiRootWorkspace();
+        
         const tasksHtml = tasks.length > 0 
             ? tasks.map(task => {
                 const parsed = this._taskService.parseAntTask(task);
+                const folderName = (task as any)._workspaceFolderName;
+                const isWorkspaceLevel = (task as any)._isWorkspaceLevel;
+                const badgeText = isWorkspaceLevel ? '🗂️ Workspace' : folderName;
+                const folderBadge = isMultiRoot && badgeText ? `<span class="folder-badge${isWorkspaceLevel ? ' workspace-level' : ''}">${escapeHtml(badgeText)}</span>` : '';
                 return `
-                    <div class="task-item" data-label="${escapeHtml(task.label)}">
+                    <div class="task-item" data-label="${escapeHtml(task.label)}" data-folder="${escapeHtml(folderName || '')}" data-workspace-level="${isWorkspaceLevel ? 'true' : 'false'}">
                         <div class="task-info">
-                            <div class="task-name">${escapeHtml(task.label)}</div>
+                            <div class="task-name">${folderBadge}${escapeHtml(task.label)}</div>
                             <div class="task-details">
                                 <span class="task-buildfile">📄 ${escapeHtml(parsed.buildFile || 'Unknown')}</span>
                                 <span class="task-targets">🎯 ${parsed.targets?.map(escapeHtml).join(', ') || 'No targets'}</span>
@@ -158,7 +170,7 @@ export class AntTasksListPanel {
                         <div class="task-actions">
                             <button class="action-btn run-btn" data-label="${escapeHtml(task.label)}" title="Run">▶</button>
                             <button class="action-btn edit-btn" data-label="${escapeHtml(task.label)}" title="Edit">✏️</button>
-                            <button class="action-btn delete-btn" data-label="${escapeHtml(task.label)}" title="Delete">🗑️</button>
+                            <button class="action-btn delete-btn" data-label="${escapeHtml(task.label)}" data-folder="${escapeHtml(folderName || '')}" title="Delete">🗑️</button>
                         </div>
                     </div>
                 `;
@@ -192,6 +204,21 @@ export class AntTasksListPanel {
             font-weight: 600;
             font-size: 1.05em;
             margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .folder-badge {
+            font-size: 0.75em;
+            font-weight: 500;
+            padding: 2px 6px;
+            background: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            border-radius: 3px;
+        }
+        .folder-badge.workspace-level {
+            background: var(--vscode-statusBarItem-prominentBackground, var(--vscode-activityBarBadge-background));
+            color: var(--vscode-statusBarItem-prominentForeground, var(--vscode-activityBarBadge-foreground));
         }
         .task-details {
             display: flex;
@@ -285,7 +312,8 @@ export class AntTasksListPanel {
         document.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const label = e.target.getAttribute('data-label');
-                vscode.postMessage({ command: 'deleteTask', label });
+                const folderName = e.target.getAttribute('data-folder');
+                vscode.postMessage({ command: 'deleteTask', label, folderName });
             });
         });
 

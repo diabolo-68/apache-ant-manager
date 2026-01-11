@@ -1,9 +1,14 @@
 {
   "name": "apache-ant-manager",
   "displayName": "Apache Ant Manager",
-  "description": "Configure and manage Apache Ant build tasks with a graphical UI similar to Eclipse",
-  "version": "0.0.1",
-  "publisher": "your-publisher",
+  "description": "Configure and manage Apache Ant tasks with a graphical UI similar to Eclipse",
+  "version": "1.0.0",
+  "publisher": "diabolo-68",
+  "author": {
+    "name": "diabolo-68"
+  },
+  "license": "MIT",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -62,6 +67,18 @@
           "type": "string",
           "default": "",
           "description": "Path to Java installation directory (JAVA_HOME). Required if Java is not in your PATH."
+        },
+        "apacheAntManager.importDepth": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Maximum depth level for following import/include statements in build files. Set to 0 to parse only the main file. Higher values may slow down parsing."
+        },
+        "apacheAntManager.useJavaParser": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use the Java Ant parser instead of the fast XML parser. The Java parser resolves Ant properties but is slower and ignores the import depth limit."
         }
       }
     }
