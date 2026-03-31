@@ -23,6 +23,7 @@ export interface AntTaskConfig {
     presentation?: { reveal: string; panel: string };
     // Parsed fields for UI
     buildFile?: string;
+    rawBuildFile?: string;
     targets?: string[];
     additionalArgs?: string;
     workingDirectory?: string;
@@ -362,8 +363,8 @@ export class AntTaskService {
     parseAntTask(task: AntTaskConfig): AntTaskConfig {
         const parsed: AntTaskConfig = { ...task };
         parsed.targets = [];
-        // Resolve workspace-relative paths to absolute paths
-        parsed.workingDirectory = this.resolveWorkspacePath(task.options?.cwd || '');
+        // Preserve the raw workspace-relative working directory (may contain ${workspaceFolder})
+        parsed.workingDirectory = task.options?.cwd || '';
         parsed.antHome = task.options?.env?.ANT_HOME || '';
         parsed.javaHome = task.options?.env?.JAVA_HOME || '';
         parsed.shell = this.detectShellFromConfig(task);
@@ -375,7 +376,9 @@ export class AntTaskService {
         while (i < task.args.length) {
             const arg = task.args[i];
             if (arg === '-f' && i + 1 < task.args.length) {
-                // Resolve workspace-relative build file path
+                // Preserve the raw build file path (may contain ${workspaceFolder})
+                parsed.rawBuildFile = task.args[i + 1];
+                // Resolve workspace-relative build file path for display/parsing
                 parsed.buildFile = this.resolveWorkspacePath(task.args[i + 1]);
                 i += 2;
             } else if (arg.startsWith('-')) {
@@ -503,8 +506,13 @@ export class AntTaskService {
         const cwd = workingDirectory || path.dirname(buildFilePath);
         
         // Convert paths to workspace-relative where possible
-        const relativeBuildFilePath = this.toWorkspaceRelativePath(buildFilePath);
-        const relativeCwd = this.toWorkspaceRelativePath(cwd);
+        // If the path already contains ${workspaceFolder}, use it as-is
+        const relativeBuildFilePath = buildFilePath.includes('${workspaceFolder')
+            ? buildFilePath
+            : this.toWorkspaceRelativePath(buildFilePath);
+        const relativeCwd = cwd.includes('${workspaceFolder')
+            ? cwd
+            : this.toWorkspaceRelativePath(cwd);
         
         let antCommand = 'ant';
         if (antHome) {

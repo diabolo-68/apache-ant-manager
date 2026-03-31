@@ -27,6 +27,7 @@ export class AntConfigurationPanel {
     private readonly _parserService: AntParserService;
     private readonly _taskService: AntTaskService;
     private _buildFilePath: string;
+    private _rawBuildFilePath: string;
     private _buildInfo: AntBuildInfo | undefined;
     private _editContext: EditContext;
     private _disposables: vscode.Disposable[] = [];
@@ -88,7 +89,8 @@ export class AntConfigurationPanel {
         this._extensionUri = extensionUri;
         this._parserService = parserService;
         this._taskService = taskService;
-        this._buildFilePath = buildFilePath;
+        this._rawBuildFilePath = buildFilePath;
+        this._buildFilePath = this._taskService.resolveWorkspacePath(buildFilePath);
         this._editContext = editContext;
 
         // Show loading state immediately
@@ -107,7 +109,7 @@ export class AntConfigurationPanel {
                     case 'saveTask':
                         try {
                             const taskConfig = this._taskService.generateTaskConfig(
-                                this._buildFilePath,
+                                this._rawBuildFilePath,
                                 message.targets,
                                 message.taskName,
                                 message.additionalArgs || '',
@@ -168,6 +170,19 @@ export class AntConfigurationPanel {
                             await this.updateBuildFile(files[0].fsPath);
                         }
                         break;
+                    case 'updateBuildFilePath':
+                        const manualPath = message.path;
+                        if (manualPath && manualPath !== this._rawBuildFilePath) {
+                            // Resolve variables to check if the file exists
+                            const resolvedPath = this._taskService.resolveWorkspacePath(manualPath);
+                            const fs = await import('fs');
+                            if (fs.existsSync(resolvedPath)) {
+                                await this.updateBuildFile(manualPath);
+                            } else {
+                                vscode.window.showWarningMessage(`Build file not found: ${resolvedPath}`);
+                            }
+                        }
+                        break;
                     case 'browseDirectory':
                         const targetField = message.target;
                         let dialogTitle = 'Select Directory';
@@ -206,7 +221,8 @@ export class AntConfigurationPanel {
     }
 
     public async updateBuildFile(buildFilePath: string): Promise<void> {
-        this._buildFilePath = buildFilePath;
+        this._rawBuildFilePath = buildFilePath;
+        this._buildFilePath = this._taskService.resolveWorkspacePath(buildFilePath);
         // Show loading state while parsing
         this._panel.webview.html = this._getLoadingHtml(this._panel.webview);
         await this._update();
@@ -340,7 +356,7 @@ export class AntConfigurationPanel {
         <section class="build-file-section">
             <h2>Build File</h2>
             <div class="build-file-row">
-                <input type="text" id="buildFilePath" value="${escapeHtml(this._buildFilePath)}" readonly>
+                <input type="text" id="buildFilePath" value="${escapeHtml(this._rawBuildFilePath)}">
                 <button id="browseBuildFile">Browse...</button>
                 <button id="refreshBtn" title="Refresh">🔄</button>
             </div>
@@ -562,6 +578,18 @@ export class AntConfigurationPanel {
         // Browse button for build file
         document.getElementById('browseBuildFile').addEventListener('click', () => {
             vscode.postMessage({ command: 'selectBuildFile' });
+        });
+
+        // Manual edit of build file path (on Enter or blur)
+        const buildFileInput = document.getElementById('buildFilePath');
+        buildFileInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                vscode.postMessage({ command: 'updateBuildFilePath', path: buildFileInput.value.trim() });
+            }
+        });
+        buildFileInput.addEventListener('blur', () => {
+            vscode.postMessage({ command: 'updateBuildFilePath', path: buildFileInput.value.trim() });
         });
 
         // Browse buttons for directories

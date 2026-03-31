@@ -66,19 +66,8 @@ export function activate(context: vscode.ExtensionContext) {
             });
         } else {
             // Edit existing task
-            const rawBuildFilePath = task.buildFile || '';
-            
-            // Resolve the build file path
-            let buildFilePath = taskService.resolveWorkspacePath(rawBuildFilePath);
-            
-            // If it's still a relative path, resolve it relative to working directory
-            if (!path.isAbsolute(buildFilePath) && !buildFilePath.startsWith('${')) {
-                let workingDir = task.workingDirectory || '';
-                if (workingDir) {
-                    workingDir = taskService.resolveWorkspacePath(workingDir);
-                    buildFilePath = path.resolve(workingDir, buildFilePath);
-                }
-            }
+            // Preserve the raw build file path (may contain ${workspaceFolder})
+            const rawBuildFilePath = task.rawBuildFile || task.buildFile || '';
             
             editContext = {
                 isEditMode: true,
@@ -89,12 +78,12 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             };
             
-            if (buildFilePath) {
+            if (rawBuildFilePath) {
                 AntConfigurationPanel.createOrShow(
                     context.extensionUri,
                     parserService,
                     taskService,
-                    buildFilePath,
+                    rawBuildFilePath,
                     editContext
                 );
             } else {

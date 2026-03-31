@@ -2,9 +2,10 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "watch-apache-ant-manager",
       "type": "npm",
       "script": "watch",
-      "problemMatcher": "$tsc-watch",
+      "problemMatcher": "$ts-webpack-watch",
       "isBackground": true,
       "presentation": {
         "reveal": "never"
@@ -17,7 +18,7 @@
     {
       "type": "npm",
       "script": "compile",
-      "problemMatcher": "$tsc",
+      "problemMatcher": "$ts-webpack",
       "group": "build"
     }
   ]
