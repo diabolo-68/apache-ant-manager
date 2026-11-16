@@ -3,19 +3,19 @@
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/diabolo-68.apache-ant-manager?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=diabolo-68.apache-ant-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A Visual Studio Code extension that provides a graphical UI for configuring Apache Ant build tasks, similar to Eclipse's Ant launcher configuration.
+A Visual Studio Code extension that provides a graphical UI for configuring and running tasks: Apache Ant builds (similar to Eclipse's Ant launcher), shell, batch, PowerShell, Python and Node.js scripts, and any custom command. Everything is saved as standard VS Code tasks in `tasks.json`.
 
 ## Features
 
--  **Visual Configuration UI** - Configure Ant tasks using a modern webview interface
--  **Build File Selection** - Browse and select Ant build.xml files
--  **Target Discovery** - Automatically parse and display available targets with descriptions
--  **Execution Order** - Define the order in which targets should be executed with drag-and-drop reordering
--  **Task Generation** - Generate VS Code tasks.json entries for your Ant configurations
--  **Tree View** - Browse Ant targets directly in the Explorer sidebar
--  **Environment Settings** - Configure working directory, ANT_HOME, JAVA_HOME, and shell
--  **Multi-Root Workspace Support** - Manage tasks across multiple workspace folders
--  **Workspace-Level Tasks** - Save tasks to the workspace file for shared configurations
+-  **Task Manager view** - A "Task Manager" section in the Explorer lists your tasks (grouped by workspace folder), with inline run / edit, and duplicate / delete in the context menu
+-  **Ant builds** - Parse a build file, pick targets (filterable, with descriptions and dependencies) and order them with drag-and-drop or Alt+↑/↓
+-  **Script tasks** - Shell (bash, sh, zsh), Batch (.bat/.cmd), PowerShell (.ps1), Python (.py, detects virtual environments) and Node.js scripts
+-  **Custom commands** - Run any program (make, gradle, docker, …), optionally through the shell
+-  **Live command preview** - See the exact command line before saving
+-  **Environment** - Working directory, environment variables, ANT_HOME / JAVA_HOME, terminal behaviour and task group
+-  **Save & Run** - Save a task and run it in one step (Ctrl+Enter); Ctrl+S saves
+-  **Re-run last task** - From the status bar
+-  **Multi-Root Workspace Support** - Save tasks to any workspace folder or to the shared workspace file, and move them between locations
 
 ## Screenshots
 
@@ -51,41 +51,46 @@ Then press F5 in VS Code to launch the extension in debug mode.
 
 ## Usage
 
-### Opening the Configuration UI
+### Creating a task
 
-1. **From Command Palette**: Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS) and run "Ant: Open Ant Configuration"
-2. **From Explorer**: Right-click on a `build.xml` file and select "Open Ant Configuration"
-3. **From Tree View**: Use the Ant Targets view in the Explorer sidebar
+1. **From the Explorer**: click **+** in the *Task Manager* view, then choose the kind of task (Ant build, shell / batch / PowerShell / Python / Node.js script, or custom command) and the file
+2. **From a file**: right-click an Ant build file or a script (`.xml`, `.sh`, `.bat`, `.cmd`, `.ps1`, `.py`, `.js`) and select **Create Task from This File**
+3. **From the Command Palette**: run **Task Manager: New Task…**
 
-### Configuring a Build Task
+### Configuring an Ant task
 
-1. Select your `build.xml` file using the Browse button
-2. Enter a name for your task
-3. Choose where to save the task (workspace folder or shared workspace file)
-4. Configure environment settings (working directory, ANT_HOME, JAVA_HOME, shell)
-5. Check the targets you want to run from the Available Targets grid
-6. Use the ▲/▼ buttons to arrange execution order in the Execution Order list
-7. Add any additional Ant arguments (e.g., `-Dproperty=value`, `-verbose`)
-8. Click **Save Task** to create a VS Code task
+1. Enter a name for your task and choose where to save it (workspace folder or shared workspace file)
+2. Tick the targets to run; selected targets move to the *Run order* group, where you can drag them (or use Alt+↑/↓) to reorder
+3. Add properties (`-Dname=value`), common options (`-verbose`, `-debug`, …) or other arguments
+4. Optionally expand **Environment** to set the working directory, ANT_HOME, JAVA_HOME or the terminal shell
+5. Check the **Command preview**, then **Save Task** (Ctrl+S) or **Save & Run** (Ctrl+Enter)
 
-### Managing Tasks
+### Configuring a script or command task
 
-- **View Tasks**: Use the "Ant: View Ant Tasks" command to see all configured tasks
-- **Run Tasks**: Click the ▶ button next to a task, or use VS Code's built-in "Run Task" command
-- **Edit Tasks**: Click the ✏️ button to modify an existing task
-- **Delete Tasks**: Click the 🗑️ button to remove a task
+1. Pick the script (or, for a custom command, the program) and enter arguments, one per line
+2. Adjust the interpreter if needed — suggestions include virtual environments found in the workspace for Python
+3. Optionally set the working directory, environment variables, terminal behaviour and task group (Build / Test)
+
+Script tasks are stored as regular `process` tasks (batch files and shell-mode custom commands as `shell` tasks), so they also appear in VS Code's **Run Task** list. A `taskManager` block in each entry lets the editor reopen it with the same settings.
+
+### Managing tasks
+
+- **Run**: click ▶ next to a task in the Task Manager view, use **Task Manager: Run Task…**, VS Code's built-in **Run Task**, or the re-run button in the status bar
+- **Run a single Ant target**: expand an Ant task in the tree and click ▶ next to a target
+- **Edit / Duplicate / Delete**: from the tree's inline buttons and context menu, or from the full-page list (**Task Manager: Open Task Manager**)
 
 ### Multi-Root Workspace Support
 
 When working with multi-root workspaces:
-- Each task shows a badge indicating which folder it belongs to
+- Tasks are grouped by the folder they belong to
 - You can save tasks to any workspace folder or to the shared workspace file
 - Moving tasks between folders is supported when editing
 
 ## Requirements
 
 - **Visual Studio Code** 1.85.0 or higher
-- **Apache Ant** - Should be installed and accessible via PATH, or configured via ANT_HOME setting
+- **Apache Ant** (for Ant tasks) - Should be installed and accessible via PATH, or configured via ANT_HOME
+- The interpreter for your scripts (bash, PowerShell, Python, Node.js, …) on PATH, or configured per task
 
 ### Optional
 
@@ -106,11 +111,12 @@ This extension contributes the following settings:
 
 | Command | Description |
 |---------|-------------|
-| `Ant: Open Ant Configuration` | Open the Ant task configuration panel |
-| `Ant: Select Ant Build File` | Browse and select an Ant build file |
-| `Ant: View Ant Tasks` | View and manage configured Ant tasks |
-| `Ant: Run Ant Targets` | Run selected Ant targets |
-| `Ant: Refresh` | Refresh the Ant targets tree view |
+| `Task Manager: New Task…` | Create an Ant, script or command task |
+| `Task Manager: Run Task…` | Pick a managed task and run it |
+| `Task Manager: Re-run Last Task` | Run the most recently run task again |
+| `Task Manager: Edit Task…` / `Duplicate Task…` / `Delete Task…` | Manage existing tasks |
+| `Task Manager: Open Task Manager` | Open the full-page task list |
+| `Task Manager: Refresh` | Reload tasks from `tasks.json` |
 
 ## Building from Source
 

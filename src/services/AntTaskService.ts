@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { TaskKind, TaskManagerMeta } from '../types/taskKinds';
 
 /**
  * Represents an Ant task configuration stored in tasks.json
@@ -18,9 +19,11 @@ export interface AntTaskConfig {
             args?: string[];
         };
     };
-    group?: { kind: string; isDefault: boolean };
+    group?: { kind: string; isDefault: boolean } | string;
     problemMatcher?: string | string[];
-    presentation?: { reveal: string; panel: string };
+    presentation?: { reveal?: string; panel?: string; clear?: boolean };
+    /** Present on script / command tasks created by this extension. */
+    taskManager?: TaskManagerMeta;
     // Parsed fields for UI
     buildFile?: string;
     rawBuildFile?: string;
@@ -42,7 +45,7 @@ export class AntTaskService {
      * Checks all workspace folders and returns the relative path for the matching one.
      * Returns the original path if it's not within any workspace folder.
      */
-    private toWorkspaceRelativePath(absolutePath: string): string {
+    toWorkspaceRelativePath(absolutePath: string): string {
         if (!absolutePath) {return absolutePath;}
         
         const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -309,38 +312,59 @@ export class AntTaskService {
      * Workspace-level tasks have _workspaceFolderName set to '__workspace__'.
      */
     getAntTasks(): AntTaskConfig[] {
+        return this.collectTasks(task => this.isAntTask(task));
+    }
+
+    /**
+     * Get every task this extension manages: Ant tasks plus script / command tasks.
+     */
+    getManagedTasks(): AntTaskConfig[] {
+        return this.collectTasks(task => this.isAntTask(task) || this.isScriptTask(task));
+    }
+
+    /** Kind of a managed task. */
+    kindOf(task: AntTaskConfig): TaskKind {
+        return task.taskManager?.kind ?? 'ant';
+    }
+
+    /** True for script / command tasks created by this extension. */
+    isScriptTask(task: AntTaskConfig): boolean {
+        return !!task.taskManager && typeof task.taskManager.kind === 'string';
+    }
+
+    private collectTasks(filter: (task: AntTaskConfig) => boolean): AntTaskConfig[] {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders || workspaceFolders.length === 0) {
             return [];
         }
 
         const allTasks: AntTaskConfig[] = [];
-        
+
         // Get tasks from each workspace folder
         for (const folder of workspaceFolders) {
             const tasksJson = this.readTasksJson(folder);
-            const antTasks = tasksJson.tasks.filter(task => this.isAntTask(task));
+            const matching = tasksJson.tasks.filter(filter);
             // Tag each task with its workspace folder for later reference
-            antTasks.forEach(task => {
+            matching.forEach(task => {
                 (task as any)._workspaceFolder = folder;
                 (task as any)._workspaceFolderName = folder.name;
                 (task as any)._isWorkspaceLevel = false;
             });
-            allTasks.push(...antTasks);
+            allTasks.push(...matching);
         }
-        
+
         // Get tasks from workspace file (if multi-root)
         if (this.isMultiRootWorkspace()) {
             const workspaceTasks = this.readWorkspaceTasks();
-            const antTasks = workspaceTasks.tasks.filter(task => this.isAntTask(task));
-            antTasks.forEach(task => {
+            const matching = workspaceTasks.tasks.filter(filter);
+            matching.forEach(task => {
                 (task as any)._workspaceFolder = undefined;
                 (task as any)._workspaceFolderName = '__workspace__';
                 (task as any)._isWorkspaceLevel = true;
             });
-            allTasks.push(...antTasks);
+            allTasks.push(...matching);
         }
-        
+
         return allTasks;
     }
 
@@ -348,6 +372,7 @@ export class AntTaskService {
      * Check if a task is an Ant task (by looking at command or args).
      */
     private isAntTask(task: AntTaskConfig): boolean {
+        if (task.taskManager) {return false;}
         if (!task.command) {return false;}
         const cmd = task.command.toLowerCase();
         if (cmd.includes('ant')) {return true;}

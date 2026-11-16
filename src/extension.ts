@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { AntTasksListPanel } from './panels/AntTasksListPanel';
 import { AntParserService } from './services/AntParserService';
 import { AntTaskService } from './services/AntTaskService';
+import { ScriptTaskService } from './services/ScriptTaskService';
+import { SCRIPT_KINDS } from './types/taskKinds';
 import { TaskActions, taskRefOf } from './taskActions';
 import { isAntBuildFile } from './util/antFiles';
 import { AntTasksTreeProvider, AntTreeNode, refFromArg } from './views/AntTasksTreeProvider';
@@ -9,7 +11,8 @@ import { AntTasksTreeProvider, AntTreeNode, refFromArg } from './views/AntTasksT
 export function activate(context: vscode.ExtensionContext) {
     const parserService = new AntParserService(context);
     const taskService = new AntTaskService();
-    const actions = new TaskActions(context, parserService, taskService);
+    const scriptService = new ScriptTaskService(taskService);
+    const actions = new TaskActions(context, parserService, taskService, scriptService);
     const tree = new AntTasksTreeProvider(actions, taskService);
 
     const treeView = vscode.window.createTreeView('apacheAntManager.tasks', {
@@ -23,14 +26,16 @@ export function activate(context: vscode.ExtensionContext) {
         if (ref) { return ref; }
         const tasks = actions.getTasks();
         if (tasks.length === 0) {
-            vscode.window.showInformationMessage('No Ant tasks yet. Use "Ant: New Ant Task…" to create one.');
+            vscode.window.showInformationMessage('No tasks yet. Use "Task Manager: New Task…" to create one.');
             return undefined;
         }
         const multi = (vscode.workspace.workspaceFolders?.length ?? 0) > 1;
         const picked = await vscode.window.showQuickPick(
             tasks.map(t => ({
-                label: t.label,
-                description: taskService.parseAntTask(t).targets?.join(' → ') || '',
+                label: `$(${t.taskManager ? SCRIPT_KINDS[t.taskManager.kind]?.icon ?? 'terminal' : 'tools'}) ${t.label}`,
+                description: t.taskManager
+                    ? [t.command, ...(t.args ?? [])].join(' ')
+                    : taskService.parseAntTask(t).targets?.join(' → ') || '',
                 detail: multi ? taskRefOf(t).folderName.replace('__workspace__', 'Workspace (shared)') : undefined,
                 ref: taskRefOf(t)
             })),
@@ -56,27 +61,27 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     register('apache-ant-manager.createTaskFromFile', (uri?: vscode.Uri) =>
-        vscode.commands.executeCommand('apache-ant-manager.openConfiguration', uri));
+        actions.createNew(uri instanceof vscode.Uri ? uri : vscode.window.activeTextEditor?.document.uri));
 
     register('apache-ant-manager.selectBuildFile', () => actions.createNew());
 
     register('apache-ant-manager.runTargets', async (arg?: AntTreeNode) => {
-        const ref = await resolveRef(arg, 'Select an Ant task to run');
+        const ref = await resolveRef(arg, 'Select a task to run');
         if (ref) { await actions.run(ref); }
     });
 
     register('apache-ant-manager.editTask', async (arg?: AntTreeNode) => {
-        const ref = await resolveRef(arg, 'Select an Ant task to edit');
+        const ref = await resolveRef(arg, 'Select a task to edit');
         if (ref) { actions.edit(ref); }
     });
 
     register('apache-ant-manager.duplicateTask', async (arg?: AntTreeNode) => {
-        const ref = await resolveRef(arg, 'Select an Ant task to duplicate');
+        const ref = await resolveRef(arg, 'Select a task to duplicate');
         if (ref) { await actions.duplicate(ref); }
     });
 
     register('apache-ant-manager.deleteTask', async (arg?: AntTreeNode) => {
-        const ref = await resolveRef(arg, 'Select an Ant task to delete');
+        const ref = await resolveRef(arg, 'Select a task to delete');
         if (ref) { await actions.delete(ref); }
     });
 

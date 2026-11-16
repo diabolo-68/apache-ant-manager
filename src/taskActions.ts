@@ -1,9 +1,12 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { AntConfigurationPanel } from './panels/AntConfigurationPanel';
+import { ScriptTaskPanel } from './panels/ScriptTaskPanel';
 import { AntParserService } from './services/AntParserService';
 import { AntTaskService, AntTaskConfig } from './services/AntTaskService';
-import { findAntBuildFiles } from './util/antFiles';
+import { ScriptTaskService } from './services/ScriptTaskService';
+import { SCRIPT_KINDS, SCRIPT_KIND_ORDER, TaskKind, scriptKindForFile } from './types/taskKinds';
+import { findAntBuildFiles, isAntBuildFile } from './util/antFiles';
 
 /** Scope id used for tasks stored in the .code-workspace file. */
 export const WORKSPACE_SCOPE = '__workspace__';
@@ -21,6 +24,8 @@ export function taskRefOf(task: AntTaskConfig): TaskRef {
     return { label: task.label, folderName: t._isWorkspaceLevel ? WORKSPACE_SCOPE : (t._workspaceFolderName || '') };
 }
 
+const EXCLUDE_GLOB = '**/{node_modules,.git,.svn,target,bin,dist,out,.venv,venv,__pycache__,.vscode-test}/**';
+
 /**
  * Task operations shared by the tree view, the task list webview and commands.
  */
@@ -35,7 +40,8 @@ export class TaskActions implements vscode.Disposable {
     constructor(
         private readonly _context: vscode.ExtensionContext,
         private readonly _parserService: AntParserService,
-        private readonly _taskService: AntTaskService
+        private readonly _taskService: AntTaskService,
+        private readonly _scriptService: ScriptTaskService
     ) {
         // Re-read tasks when tasks.json or the workspace file changes on disk.
         const watcher = vscode.workspace.createFileSystemWatcher('**/.vscode/tasks.json');
@@ -65,7 +71,7 @@ export class TaskActions implements vscode.Disposable {
     }
 
     getTasks(): AntTaskConfig[] {
-        return this._taskService.getAntTasks();
+        return this._taskService.getManagedTasks();
     }
 
     findTask(ref: TaskRef): AntTaskConfig | undefined {
@@ -103,7 +109,7 @@ export class TaskActions implements vscode.Disposable {
     /** Run one target of a saved task, reusing that task's environment. */
     async runTarget(ref: TaskRef, targetName: string): Promise<void> {
         const task = this.findTask(ref);
-        if (!task) { return; }
+        if (!task || this._taskService.kindOf(task) !== 'ant') { return; }
         const parsed = this._taskService.parseAntTask(task);
         if (!parsed.buildFile) {
             vscode.window.showWarningMessage(`Could not determine the build file for "${ref.label}".`);
@@ -127,6 +133,13 @@ export class TaskActions implements vscode.Disposable {
             this.notifyChanged();
             return;
         }
+        if (this._taskService.kindOf(task) !== 'ant') {
+            ScriptTaskPanel.createOrShow(this._context.extensionUri, this._taskService, this._scriptService, {
+                task,
+                onSaveComplete: () => this.notifyChanged()
+            });
+            return;
+        }
         const parsed = this._parsed(task);
         const rawBuildFilePath = parsed.rawBuildFile || parsed.buildFile || '';
         if (!rawBuildFilePath) {
@@ -148,34 +161,80 @@ export class TaskActions implements vscode.Disposable {
     }
 
     /**
-     * Open the editor for a new task. Without a build file, offers a quick pick of
-     * the Ant build files found in the workspace (plus "Browse…").
+     * Start a new task. With a file, the kind is inferred from it; otherwise the user
+     * picks a kind and then a file (Ant build files and scripts found in the workspace, or "Browse…").
      */
-    async createNew(buildFile?: vscode.Uri): Promise<void> {
-        const uri = buildFile ?? await this._pickBuildFile();
-        if (!uri) { return; }
-        AntConfigurationPanel.createOrShow(
-            this._context.extensionUri,
-            this._parserService,
-            this._taskService,
-            uri.fsPath,
-            { isEditMode: false, onSaveComplete: () => this.notifyChanged() }
-        );
+    async createNew(file?: vscode.Uri, kind?: TaskKind): Promise<void> {
+        if (file && !kind) {
+            kind = (await isAntBuildFile(file.fsPath)) ? 'ant' : scriptKindForFile(file.fsPath);
+            if (!kind) {
+                kind = await this._pickKind('What should run this file?');
+                if (!kind) { return; }
+            }
+        }
+        kind ??= await this._pickKind();
+        if (!kind) { return; }
+
+        if (kind === 'ant') {
+            const uri = file ?? await this._pickFile('ant');
+            if (!uri) { return; }
+            AntConfigurationPanel.createOrShow(
+                this._context.extensionUri,
+                this._parserService,
+                this._taskService,
+                uri.fsPath,
+                { isEditMode: false, onSaveComplete: () => this.notifyChanged() }
+            );
+            return;
+        }
+
+        let scriptPath: string | undefined;
+        if (kind !== 'custom') {
+            const uri = file ?? await this._pickFile(kind);
+            if (!uri) { return; }
+            scriptPath = uri.fsPath;
+        }
+        ScriptTaskPanel.createOrShow(this._context.extensionUri, this._taskService, this._scriptService, {
+            kind,
+            scriptPath,
+            onSaveComplete: () => this.notifyChanged()
+        });
     }
 
-    private async _pickBuildFile(): Promise<vscode.Uri | undefined> {
+    private async _pickKind(title = 'New Task'): Promise<TaskKind | undefined> {
+        type Item = vscode.QuickPickItem & { taskKind: TaskKind };
+        const items: Item[] = [
+            { label: '$(tools) Ant build', description: 'Run targets from an Ant build file', taskKind: 'ant' },
+            ...SCRIPT_KIND_ORDER.map(k => ({
+                label: `$(${SCRIPT_KINDS[k].icon}) ${SCRIPT_KINDS[k].label}`,
+                description: SCRIPT_KINDS[k].description,
+                taskKind: k as TaskKind
+            }))
+        ];
+        const picked = await vscode.window.showQuickPick(items, { title, placeHolder: 'What kind of task?' });
+        return picked?.taskKind;
+    }
+
+    /** Quick pick of matching files in the workspace, plus "Browse…". */
+    private async _pickFile(kind: TaskKind): Promise<vscode.Uri | undefined> {
         type Item = vscode.QuickPickItem & { uri?: vscode.Uri };
+        const info = kind === 'ant' ? undefined : SCRIPT_KINDS[kind];
         const browse: Item = { label: '$(folder-opened) Browse…', description: 'Pick any file on disk', alwaysShow: true };
 
         const qp = vscode.window.createQuickPick<Item>();
-        qp.title = 'New Ant Task';
-        qp.placeholder = 'Select the Ant build file for this task';
+        qp.title = kind === 'ant' ? 'New Ant Task' : `New ${info!.label} Task`;
+        qp.placeholder = kind === 'ant' ? 'Select the Ant build file for this task' : `Select the ${info!.label.toLowerCase()} to run`;
+        qp.matchOnDescription = true;
         qp.busy = true;
         qp.items = [browse];
         qp.show();
 
         const cts = new vscode.CancellationTokenSource();
-        findAntBuildFiles(cts.token).then(files => {
+        const find: Thenable<vscode.Uri[]> = kind === 'ant'
+            ? findAntBuildFiles(cts.token)
+            : vscode.workspace.findFiles(`**/*.{${info!.extensions.join(',')}}`, EXCLUDE_GLOB, 500, cts.token)
+                .then(files => files.sort((a, b) => a.fsPath.localeCompare(b.fsPath)));
+        find.then(files => {
             const multiRoot = (vscode.workspace.workspaceFolders?.length ?? 0) > 1;
             const items: Item[] = files.map(uri => ({
                 label: `$(file-code) ${path.basename(uri.fsPath)}`,
@@ -202,8 +261,10 @@ export class TaskActions implements vscode.Disposable {
             canSelectFiles: true,
             canSelectFolders: false,
             canSelectMany: false,
-            filters: { 'Ant Build Files': ['xml'] },
-            title: 'Select Ant Build File'
+            filters: kind === 'ant'
+                ? { 'Ant Build Files': ['xml'] }
+                : { [info!.label]: info!.extensions, 'All files': ['*'] },
+            title: kind === 'ant' ? 'Select Ant Build File' : `Select ${info!.label}`
         });
         return files?.[0];
     }
@@ -260,7 +321,7 @@ export class TaskActions implements vscode.Disposable {
         const ref = this._context.workspaceState.get<TaskRef>(LAST_RUN_KEY);
         if (ref && this.findTask(ref)) {
             this._statusItem.text = `$(play) ${ref.label}`;
-            this._statusItem.tooltip = `Run Ant task "${ref.label}" again`;
+            this._statusItem.tooltip = `Run task "${ref.label}" again`;
             this._statusItem.show();
         } else {
             this._statusItem.hide();

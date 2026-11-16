@@ -5,6 +5,28 @@ All notable changes to the "Apache Ant Manager" extension will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Script and command tasks** - Create tasks for shell, batch, PowerShell, Python and Node.js scripts, and custom commands, with interpreter suggestions (incl. Python virtual environments), arguments, environment variables, terminal and task-group options
+- **Task Manager view** in the Explorer with inline run / edit, duplicate, delete and per-target run for Ant tasks
+- **Re-run last task** status bar item
+- **Command preview**, **Save & Run** and keyboard shortcuts (Ctrl+S, Ctrl+Enter) in the task editors
+- New-task flow lists matching files found in the workspace
+
+### Changed
+
+- Redesigned Ant task editor: single filterable target list with drag-and-drop ordering, structured arguments, collapsible environment section, inline validation, sticky action bar
+- Task list grouped by workspace folder with relative paths and hover actions
+- Native look: emoji replaced with VS Code codicons
+- Commands are now in the "Task Manager" category
+
+### Fixed
+
+- Running a task now picks the task from the right workspace folder when several folders have a task with the same name
+- Switching the build file in the editor no longer discards the other form values
+
 ## [1.0.0] - 2026-01-11
 
 ### Added

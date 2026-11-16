@@ -299,7 +299,7 @@ export class AntConfigurationPanel {
         const editTask = this._editContext.task as any;
         const editScope = editTask?._isWorkspaceLevel ? WORKSPACE_SCOPE : editTask?._workspaceFolderName;
         const result: Record<string, string[]> = {};
-        for (const t of this._taskService.getAntTasks() as any[]) {
+        for (const t of this._taskService.getManagedTasks() as any[]) {
             const scope = t._isWorkspaceLevel ? WORKSPACE_SCOPE : t._workspaceFolderName;
             if (this._editContext.isEditMode && t.label === this._editContext.originalLabel && scope === editScope) {
                 continue;

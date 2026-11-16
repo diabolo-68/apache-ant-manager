@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { AntTaskService, AntTaskConfig } from '../services/AntTaskService';
 import { TaskActions, TaskRef, taskRefOf, WORKSPACE_SCOPE } from '../taskActions';
 import { displayBuildFile } from '../util/antFiles';
+import { SCRIPT_KINDS } from '../types/taskKinds';
 
 export type AntTreeNode =
     | { kind: 'scope'; folderName: string; tasks: AntTaskConfig[] }
@@ -41,6 +42,7 @@ export class AntTasksTreeProvider implements vscode.TreeDataProvider<AntTreeNode
             return node.tasks.map(task => this._taskNode(task));
         }
         if (node.kind === 'task') {
+            if (this._taskService.kindOf(node.task) !== 'ant') { return []; }
             const targets = this._taskService.parseAntTask(node.task).targets ?? [];
             return targets.map((target, index) => ({ kind: 'target', ref: node.ref, target, index }));
         }
@@ -49,6 +51,34 @@ export class AntTasksTreeProvider implements vscode.TreeDataProvider<AntTreeNode
 
     private _taskNode(task: AntTaskConfig): AntTreeNode {
         return { kind: 'task', ref: taskRefOf(task), task };
+    }
+
+    private _scriptTaskItem(task: AntTaskConfig, ref: TaskRef): vscode.TreeItem {
+        const meta = task.taskManager!;
+        const info = SCRIPT_KINDS[meta.kind] ?? SCRIPT_KINDS.custom;
+        const item = new vscode.TreeItem(task.label, vscode.TreeItemCollapsibleState.None);
+        item.id = `task:${ref.folderName}:${ref.label}`;
+        item.contextValue = 'scriptTask';
+
+        const commandLine = [task.command, ...(meta.kind === 'custom' ? meta.scriptArgs : [])].join(' ');
+        if (meta.kind !== 'custom' && meta.script) {
+            // Use the file icon theme (Python, PowerShell, … icons) for script files.
+            item.resourceUri = vscode.Uri.file(this._taskService.resolveWorkspacePath(meta.script));
+            item.iconPath = vscode.ThemeIcon.File;
+            item.description = shortPath(meta.script);
+        } else {
+            item.iconPath = new vscode.ThemeIcon(info.icon);
+            item.description = commandLine;
+        }
+
+        const md = new vscode.MarkdownString();
+        md.appendMarkdown(`**${task.label}** — ${info.label}\n\n`);
+        const full = [task.command, ...(task.args ?? [])].join(' ');
+        md.appendCodeblock(full, 'shell');
+        if (task.options?.cwd) { md.appendMarkdown(`Working directory: \`${task.options.cwd}\``); }
+        item.tooltip = md;
+        item.command = { command: 'apache-ant-manager.editTask', title: 'Edit', arguments: [{ kind: 'task', ref, task }] };
+        return item;
     }
 
     getTreeItem(node: AntTreeNode): vscode.TreeItem {
@@ -62,6 +92,9 @@ export class AntTasksTreeProvider implements vscode.TreeDataProvider<AntTreeNode
                 return item;
             }
             case 'task': {
+                if (this._taskService.kindOf(node.task) !== 'ant') {
+                    return this._scriptTaskItem(node.task, node.ref);
+                }
                 const parsed = this._taskService.parseAntTask(node.task);
                 const item = new vscode.TreeItem(node.task.label, vscode.TreeItemCollapsibleState.Collapsed);
                 item.id = `task:${node.ref.folderName}:${node.ref.label}`;
@@ -89,6 +122,11 @@ export class AntTasksTreeProvider implements vscode.TreeDataProvider<AntTreeNode
             }
         }
     }
+}
+
+/** Strip ${workspaceFolder…}/ prefixes for display. */
+function shortPath(p: string): string {
+    return p.replace(/^\$\{workspaceFolder(?::[^}]+)?\}[\\/]?/, '');
 }
 
 /** Resolve the task reference from a tree node or a raw TaskRef passed to a command. */

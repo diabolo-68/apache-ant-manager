@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { AntTaskService, AntTaskConfig } from '../services/AntTaskService';
 import { TaskActions, TaskRef, taskRefOf, WORKSPACE_SCOPE } from '../taskActions';
 import { displayBuildFile } from '../util/antFiles';
+import { SCRIPT_KINDS } from '../types/taskKinds';
 import { escapeHtml, icon, renderPage } from './webviewUtils';
 
 /**
@@ -25,7 +26,7 @@ export class AntTasksListPanel {
 
         const panel = vscode.window.createWebviewPanel(
             AntTasksListPanel.viewType,
-            'Ant Tasks',
+            'Tasks',
             column || vscode.ViewColumn.One,
             {
                 enableScripts: true,
@@ -72,20 +73,38 @@ export class AntTasksListPanel {
         this._panel.webview.html = this._getHtml(this._panel.webview);
     }
 
-    private _taskRow(task: AntTaskConfig): string {
+    private _details(task: AntTaskConfig): { icon: string; badge: string; details: string } {
+        const meta = task.taskManager;
+        if (meta) {
+            const info = SCRIPT_KINDS[meta.kind] ?? SCRIPT_KINDS.custom;
+            const short = (p: string) => p.replace(/^\$\{workspaceFolder(?::[^}]+)?\}[\\/]?/, '');
+            const args = meta.scriptArgs?.length ? `<span>${icon('symbol-parameter')}${escapeHtml(meta.scriptArgs.join(' '))}</span>` : '';
+            const main = meta.kind === 'custom'
+                ? `<span>${icon('terminal')}<code>${escapeHtml(task.command)}</code></span>`
+                : `<span title="${escapeHtml(meta.script)}">${icon('file-code')}${escapeHtml(short(meta.script))}</span>
+                   <span title="Interpreter">${icon('run')}${escapeHtml(task.command)}</span>`;
+            return { icon: info.icon, badge: info.shortLabel, details: main + args };
+        }
         const parsed = this._taskService.parseAntTask(task);
+        const targets = parsed.targets?.length ? parsed.targets.map(escapeHtml).join(' → ') : '<em>no targets</em>';
+        return {
+            icon: 'tools',
+            badge: 'Ant',
+            details: `<span title="${escapeHtml(parsed.buildFile)}">${icon('file-code')}${escapeHtml(displayBuildFile(parsed.rawBuildFile || parsed.buildFile))}</span>
+                      <span>${icon('target')}${targets}</span>`
+        };
+    }
+
+    private _taskRow(task: AntTaskConfig): string {
         const ref = taskRefOf(task);
         const data = `data-label="${escapeHtml(ref.label)}" data-folder="${escapeHtml(ref.folderName)}"`;
-        const targets = parsed.targets?.length ? parsed.targets.map(escapeHtml).join(' → ') : '<em>no targets</em>';
+        const d = this._details(task);
         return `
         <div class="task-row" tabindex="0" role="button" aria-label="Edit task ${escapeHtml(task.label)}" ${data}>
-            ${icon('tools')}
+            ${icon(d.icon)}
             <div class="task-info">
-                <div class="task-name">${escapeHtml(task.label)}</div>
-                <div class="task-details">
-                    <span title="${escapeHtml(parsed.buildFile)}">${icon('file-code')}${escapeHtml(displayBuildFile(parsed.rawBuildFile || parsed.buildFile))}</span>
-                    <span>${icon('target')}${targets}</span>
-                </div>
+                <div class="task-name">${escapeHtml(task.label)} <span class="badge outline">${escapeHtml(d.badge)}</span></div>
+                <div class="task-details">${d.details}</div>
             </div>
             <div class="task-actions">
                 <button class="icon-btn" data-action="runTask" ${data} title="Run" aria-label="Run ${escapeHtml(task.label)}">${icon('play')}</button>
@@ -112,8 +131,8 @@ export class AntTasksListPanel {
             content = `
             <div class="empty-state">
                 <div class="state-icon">${icon('tools')}</div>
-                <h2>No Ant tasks yet</h2>
-                <p>Pick a build file, choose targets, and save them as a reusable VS Code task.</p>
+                <h2>No tasks yet</h2>
+                <p>Turn an Ant build, a shell, batch, PowerShell, Python or Node.js script, or any command into a reusable VS Code task.</p>
                 <button class="primary" data-action="addTask">${icon('add')} Create your first task</button>
             </div>`;
         } else if (showGroups) {
@@ -131,11 +150,11 @@ export class AntTasksListPanel {
         }
 
         return renderPage(webview, this._extensionUri, {
-            title: 'Ant Tasks',
+            title: 'Tasks',
             body: `
             <div class="container">
                 <header class="page-header">
-                    <h1>${icon('tools')} Ant Tasks</h1>
+                    <h1>${icon('tools')} Tasks</h1>
                     <div class="toolbar">
                         <button class="icon-btn" data-action="refresh" title="Refresh" aria-label="Refresh">${icon('refresh')}</button>
                         <button class="primary" data-action="addTask">${icon('add')} New Task</button>

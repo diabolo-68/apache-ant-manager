@@ -1,7 +1,7 @@
 {
   "name": "apache-ant-manager",
   "displayName": "Apache Ant Manager",
-  "description": "Configure and manage Apache Ant tasks with a graphical UI similar to Eclipse",
+  "description": "Configure and run Apache Ant builds, shell, batch, PowerShell, Python and Node.js scripts, and custom commands as VS Code tasks — with a graphical UI",
   "version": "1.0.0",
   "publisher": "diabolo-68",
   "author": {
@@ -32,7 +32,7 @@
       "explorer": [
         {
           "id": "apacheAntManager.tasks",
-          "name": "Ant Tasks",
+          "name": "Task Manager",
           "icon": "$(tools)",
           "when": "workspaceFolderCount > 0"
         }
@@ -41,67 +41,67 @@
     "viewsWelcome": [
       {
         "view": "apacheAntManager.tasks",
-        "contents": "No Ant tasks yet.\nPick a build file, choose targets, and save them as a reusable VS Code task.\n[$(add) New Ant Task](command:apache-ant-manager.selectBuildFile)"
+        "contents": "No tasks yet.\nTurn an Ant build, a script (shell, batch, PowerShell, Python, Node.js) or any command into a reusable VS Code task.\n[$(add) New Task](command:apache-ant-manager.selectBuildFile)"
       }
     ],
     "commands": [
       {
         "command": "apache-ant-manager.openConfiguration",
         "title": "Open Task Manager",
-        "category": "Ant",
+        "category": "Task Manager",
         "icon": "$(list-flat)"
       },
       {
         "command": "apache-ant-manager.selectBuildFile",
-        "title": "New Ant Task…",
-        "category": "Ant",
+        "title": "New Task…",
+        "category": "Task Manager",
         "icon": "$(add)"
       },
       {
         "command": "apache-ant-manager.createTaskFromFile",
-        "title": "Create Ant Task from This File",
-        "category": "Ant"
+        "title": "Create Task from This File",
+        "category": "Task Manager"
       },
       {
         "command": "apache-ant-manager.runTargets",
-        "title": "Run Ant Task…",
-        "category": "Ant",
+        "title": "Run Task…",
+        "category": "Task Manager",
         "icon": "$(play)"
       },
       {
         "command": "apache-ant-manager.rerunLastTask",
-        "title": "Re-run Last Ant Task",
-        "category": "Ant",
+        "title": "Re-run Last Task",
+        "category": "Task Manager",
         "icon": "$(debug-rerun)"
       },
       {
         "command": "apache-ant-manager.editTask",
-        "title": "Edit Ant Task…",
-        "category": "Ant",
+        "title": "Edit Task…",
+        "category": "Task Manager",
         "icon": "$(edit)"
       },
       {
         "command": "apache-ant-manager.duplicateTask",
-        "title": "Duplicate Ant Task…",
-        "category": "Ant",
+        "title": "Duplicate Task…",
+        "category": "Task Manager",
         "icon": "$(copy)"
       },
       {
         "command": "apache-ant-manager.deleteTask",
-        "title": "Delete Ant Task…",
-        "category": "Ant",
+        "title": "Delete Task…",
+        "category": "Task Manager",
         "icon": "$(trash)"
       },
       {
         "command": "apache-ant-manager.runSingleTarget",
-        "title": "Run This Target Only",
-        "category": "Ant",
+        "title": "Run This Ant Target Only",
+        "category": "Task Manager",
         "icon": "$(play)"
       },
       {
         "command": "apache-ant-manager.refresh",
         "title": "Refresh",
-        "category": "Ant",
+        "category": "Task Manager",
         "icon": "$(refresh)"
       }
     ],
@@ -110,13 +110,13 @@
         "command": "apache-ant-manager.deleteTask",
         "key": "delete",
         "mac": "cmd+backspace",
-        "when": "focusedView == apacheAntManager.tasks && viewItem == antTask"
+        "when": "focusedView == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/"
       }
     ],
     "menus": {
       "explorer/context": [
         {
-          "when": "resourceExtname == .xml",
+          "when": "resourceExtname =~ /^\\.(xml|sh|bash|bat|cmd|ps1|py|js|mjs|cjs)$/i",
           "command": "apache-ant-manager.createTaskFromFile",
           "group": "navigation"
         }
@@ -141,32 +141,32 @@
       "view/item/context": [
         {
           "command": "apache-ant-manager.runTargets",
-          "when": "view == apacheAntManager.tasks && viewItem == antTask",
+          "when": "view == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/",
           "group": "inline@1"
         },
         {
           "command": "apache-ant-manager.editTask",
-          "when": "view == apacheAntManager.tasks && viewItem == antTask",
+          "when": "view == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/",
           "group": "inline@2"
         },
         {
           "command": "apache-ant-manager.runTargets",
-          "when": "view == apacheAntManager.tasks && viewItem == antTask",
+          "when": "view == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/",
           "group": "1_run@1"
         },
         {
           "command": "apache-ant-manager.editTask",
-          "when": "view == apacheAntManager.tasks && viewItem == antTask",
+          "when": "view == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/",
           "group": "2_edit@1"
         },
         {
           "command": "apache-ant-manager.duplicateTask",
-          "when": "view == apacheAntManager.tasks && viewItem == antTask",
+          "when": "view == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/",
           "group": "2_edit@2"
         },
         {
           "command": "apache-ant-manager.deleteTask",
-          "when": "view == apacheAntManager.tasks && viewItem == antTask",
+          "when": "view == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/",
           "group": "3_delete@1"
         },
         {
@@ -240,5 +240,17 @@
     "typescript": "^5.7.0",
     "webpack": "^5.105.2",
     "webpack-cli": "^5.1.4"
-  }
+  },
+  "keywords": [
+    "ant",
+    "apache ant",
+    "tasks",
+    "task runner",
+    "build",
+    "scripts",
+    "bash",
+    "powershell",
+    "batch",
+    "python"
+  ]
 }
