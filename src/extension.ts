@@ -1,211 +1,101 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
-import { AntConfigurationPanel, EditContext } from './panels/AntConfigurationPanel';
 import { AntTasksListPanel } from './panels/AntTasksListPanel';
 import { AntParserService } from './services/AntParserService';
-import { AntTaskService, AntTaskConfig } from './services/AntTaskService';
-
-/**
- * Check if a file is an Apache Ant build file by looking for DOCTYPE or project element.
- */
-async function isAntBuildFile(filePath: string): Promise<boolean> {
-    try {
-        // Read just the first portion of the file (enough to find DOCTYPE/project element)
-        const buffer = Buffer.alloc(2048);
-        const fd = fs.openSync(filePath, 'r');
-        const bytesRead = fs.readSync(fd, buffer, 0, 2048, 0);
-        fs.closeSync(fd);
-        
-        const content = buffer.toString('utf8', 0, bytesRead);
-        
-        // Check for Ant DOCTYPE or project element with xmlns for Ant
-        return /<!DOCTYPE\s+project\b/i.test(content) || 
-               /<project\b[^>]*\bxmlns\s*=\s*["']antlib:/i.test(content) ||
-               /<project\b[^>]*\bdefault\s*=/i.test(content) ||
-               /<project\b[^>]*\bbasedir\s*=/i.test(content);
-    } catch {
-        return false;
-    }
-}
+import { AntTaskService } from './services/AntTaskService';
+import { TaskActions, taskRefOf } from './taskActions';
+import { isAntBuildFile } from './util/antFiles';
+import { AntTasksTreeProvider, AntTreeNode, refFromArg } from './views/AntTasksTreeProvider';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Apache Ant Manager is now active');
-
     const parserService = new AntParserService(context);
     const taskService = new AntTaskService();
+    const actions = new TaskActions(context, parserService, taskService);
+    const tree = new AntTasksTreeProvider(actions, taskService);
 
-    // Helper function to open the task editor
-    const openTaskEditor = (task: AntTaskConfig | null, isNew: boolean) => {
-        let buildFilePath: string;
-        let editContext: EditContext;
+    const treeView = vscode.window.createTreeView('apacheAntManager.tasks', {
+        treeDataProvider: tree,
+        showCollapseAll: true
+    });
 
-        if (isNew || !task) {
-            // For new task, prompt for build file
-            vscode.window.showOpenDialog({
-                canSelectFiles: true,
-                canSelectFolders: false,
-                canSelectMany: false,
-                filters: { 'Ant Build Files': ['xml'] },
-                title: 'Select Ant Build File'
-            }).then(files => {
-                if (files && files.length > 0) {
-                    AntConfigurationPanel.createOrShow(
-                        context.extensionUri,
-                        parserService,
-                        taskService,
-                        files[0].fsPath,
-                        {
-                            isEditMode: false,
-                            onSaveComplete: () => {
-                                AntTasksListPanel.currentPanel?.refresh();
-                            }
-                        }
-                    );
-                }
-            });
-        } else {
-            // Edit existing task
-            // Preserve the raw build file path (may contain ${workspaceFolder})
-            const rawBuildFilePath = task.rawBuildFile || task.buildFile || '';
-            
-            editContext = {
-                isEditMode: true,
-                originalLabel: task.label,
-                task: task,
-                onSaveComplete: () => {
-                    AntTasksListPanel.currentPanel?.refresh();
-                }
-            };
-            
-            if (rawBuildFilePath) {
-                AntConfigurationPanel.createOrShow(
-                    context.extensionUri,
-                    parserService,
-                    taskService,
-                    rawBuildFilePath,
-                    editContext
-                );
-            } else {
-                vscode.window.showWarningMessage('Could not determine build file for this task');
-            }
+    /** Tree commands receive a node; palette invocations receive nothing, so ask. */
+    const resolveRef = async (arg: unknown, placeHolder: string) => {
+        const ref = refFromArg(arg);
+        if (ref) { return ref; }
+        const tasks = actions.getTasks();
+        if (tasks.length === 0) {
+            vscode.window.showInformationMessage('No Ant tasks yet. Use "Ant: New Ant Task…" to create one.');
+            return undefined;
         }
+        const multi = (vscode.workspace.workspaceFolders?.length ?? 0) > 1;
+        const picked = await vscode.window.showQuickPick(
+            tasks.map(t => ({
+                label: t.label,
+                description: taskService.parseAntTask(t).targets?.join(' → ') || '',
+                detail: multi ? taskRefOf(t).folderName.replace('__workspace__', 'Workspace (shared)') : undefined,
+                ref: taskRefOf(t)
+            })),
+            { placeHolder }
+        );
+        return picked?.ref;
     };
 
-    // Command: Open Ant Task Manager (main list view)
-    const openConfigurationCommand = vscode.commands.registerCommand(
-        'apache-ant-manager.openConfiguration',
-        async (uri?: vscode.Uri) => {
-            if (uri) {
-                // Validate that this is an Ant build file
-                const isAntFile = await isAntBuildFile(uri.fsPath);
-                if (!isAntFile) {
-                    vscode.window.showWarningMessage('This file does not appear to be an Apache Ant build file.');
-                    return;
-                }
-                // Open the editor for this Ant file
-                AntConfigurationPanel.createOrShow(
-                    context.extensionUri,
-                    parserService,
-                    taskService,
-                    uri.fsPath,
-                    { isEditMode: false }
-                );
-            } else {
-                // Otherwise, show the task list
-                AntTasksListPanel.createOrShow(
-                    context.extensionUri,
-                    taskService,
-                    parserService,
-                    openTaskEditor
-                );
-            }
-        }
-    );
+    const register = (id: string, fn: (...args: any[]) => unknown) =>
+        context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-    // Command: Select Build File (create new task)
-    const selectBuildFileCommand = vscode.commands.registerCommand(
-        'apache-ant-manager.selectBuildFile',
-        async () => {
-            const files = await vscode.window.showOpenDialog({
-                canSelectFiles: true,
-                canSelectFolders: false,
-                canSelectMany: false,
-                filters: {
-                    'Ant Build Files': ['xml']
-                },
-                title: 'Select Ant Build File'
-            });
-
-            if (files && files.length > 0) {
-                AntConfigurationPanel.createOrShow(
-                    context.extensionUri,
-                    parserService,
-                    taskService,
-                    files[0].fsPath,
-                    { isEditMode: false }
-                );
-            }
-        }
-    );
-
-    // Command: Run Targets
-    const runTargetsCommand = vscode.commands.registerCommand(
-        'apache-ant-manager.runTargets',
-        async () => {
-            // Show quick pick to select from existing Ant tasks
-            const tasks = taskService.getAntTasks();
-            
-            if (tasks.length === 0) {
-                vscode.window.showWarningMessage('No Ant tasks configured. Use "Ant: Open Ant Configuration" to create one.');
+    // Open the task manager webview, or — from the Explorer context menu — a new task for that file.
+    register('apache-ant-manager.openConfiguration', async (uri?: vscode.Uri) => {
+        if (uri instanceof vscode.Uri) {
+            if (!(await isAntBuildFile(uri.fsPath))) {
+                vscode.window.showWarningMessage('This file does not appear to be an Apache Ant build file.');
                 return;
             }
-
-            const selected = await vscode.window.showQuickPick(
-                tasks.map(t => ({
-                    label: t.label,
-                    description: taskService.parseAntTask(t).targets?.join(', ') || ''
-                })),
-                { placeHolder: 'Select an Ant task to run' }
-            );
-
-            if (selected) {
-                const task = tasks.find(t => t.label === selected.label);
-                if (task) {
-                    const parsed = taskService.parseAntTask(task);
-                    if (parsed.buildFile && parsed.targets) {
-                        await taskService.runAntTargets(parsed.buildFile, parsed.targets);
-                    }
-                }
-            }
+            await actions.createNew(uri);
+        } else {
+            AntTasksListPanel.createOrShow(context.extensionUri, actions, taskService);
         }
-    );
+    });
 
-    // Command: Run single target from tree view
-    const runSingleTargetCommand = vscode.commands.registerCommand(
-        'apache-ant-manager.runSingleTarget',
-        async (buildFilePath: string, targetName: string) => {
-            await taskService.runAntTargets(buildFilePath, [targetName]);
+    register('apache-ant-manager.createTaskFromFile', (uri?: vscode.Uri) =>
+        vscode.commands.executeCommand('apache-ant-manager.openConfiguration', uri));
+
+    register('apache-ant-manager.selectBuildFile', () => actions.createNew());
+
+    register('apache-ant-manager.runTargets', async (arg?: AntTreeNode) => {
+        const ref = await resolveRef(arg, 'Select an Ant task to run');
+        if (ref) { await actions.run(ref); }
+    });
+
+    register('apache-ant-manager.editTask', async (arg?: AntTreeNode) => {
+        const ref = await resolveRef(arg, 'Select an Ant task to edit');
+        if (ref) { actions.edit(ref); }
+    });
+
+    register('apache-ant-manager.duplicateTask', async (arg?: AntTreeNode) => {
+        const ref = await resolveRef(arg, 'Select an Ant task to duplicate');
+        if (ref) { await actions.duplicate(ref); }
+    });
+
+    register('apache-ant-manager.deleteTask', async (arg?: AntTreeNode) => {
+        const ref = await resolveRef(arg, 'Select an Ant task to delete');
+        if (ref) { await actions.delete(ref); }
+    });
+
+    register('apache-ant-manager.rerunLastTask', () => actions.rerunLast());
+
+    // Run one target. Called from the tree (node) or programmatically (buildFile, targetName).
+    register('apache-ant-manager.runSingleTarget', async (arg: AntTreeNode | string, targetName?: string) => {
+        if (typeof arg === 'string' && targetName) {
+            await taskService.runAntTargets(arg, [targetName]);
+        } else if (arg && typeof arg === 'object' && arg.kind === 'target') {
+            await actions.runTarget(arg.ref, arg.target);
         }
-    );
+    });
 
-    // Command: Refresh
-    const refreshCommand = vscode.commands.registerCommand(
-        'apache-ant-manager.refresh',
-        () => {
-            AntTasksListPanel.currentPanel?.refresh();
-        }
-    );
+    register('apache-ant-manager.refresh', () => actions.notifyChanged());
 
-    context.subscriptions.push(
-        openConfigurationCommand,
-        selectBuildFileCommand,
-        runTargetsCommand,
-        runSingleTargetCommand,
-        refreshCommand
-    );
+    context.subscriptions.push(actions, treeView);
 }
 
 export function deactivate() {
-    // Cleanup
+    // Cleanup handled by disposables
 }

@@ -402,12 +402,21 @@ export class AntTaskService {
      * Run a saved task from tasks.json by its label.
      * This is equivalent to running "Run Task" from the command palette.
      */
-    async runSavedTask(taskLabel: string): Promise<boolean> {
+    async runSavedTask(taskLabel: string, folderName?: string): Promise<boolean> {
         // Fetch all tasks defined in the workspace (including tasks.json)
         const allTasks = await vscode.tasks.fetchTasks();
-        
-        // Find the task by label
-        const taskToRun = allTasks.find(task => task.name === taskLabel);
+
+        // Find the task by label, preferring the one in the requested scope
+        // ('__workspace__' = .code-workspace file, otherwise a workspace folder name)
+        const inScope = (task: vscode.Task) => {
+            if (!folderName) { return true; }
+            if (folderName === '__workspace__') {
+                return task.scope === vscode.TaskScope.Workspace;
+            }
+            return typeof task.scope === 'object' && task.scope.name === folderName;
+        };
+        const byName = allTasks.filter(task => task.name === taskLabel);
+        const taskToRun = byName.find(inScope) ?? byName[0];
         
         if (taskToRun) {
             await vscode.tasks.executeTask(taskToRun);
