@@ -1,2 +1,5 @@
+# Writes its first argument to powershell.out in the current directory (checked by the tests).
 param([string]$Stage = 'staging')
-Write-Output "Deploying to $Stage"
+$message = "Deploying to $Stage"
+Write-Output $message
+Set-Content -Path 'powershell.out' -Value $message -Encoding ascii

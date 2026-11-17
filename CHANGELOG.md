@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Re-run last task** status bar item
 - **Command preview**, **Save & Run** and keyboard shortcuts (Ctrl+S, Ctrl+Enter) in the task editors
 - New-task flow lists matching files found in the workspace
-- Test suites: unit tests (mocha), integration tests in VS Code (@vscode/test-cli) and Playwright end-to-end tests, run on Linux and Windows in CI
+- Test suites: unit tests (mocha), integration tests in VS Code (@vscode/test-cli) and Playwright end-to-end tests, run on Linux, Windows and macOS in CI
+- Platform tests that create and run every script kind the current OS supports (Batch and PowerShell on Windows, shell scripts on Linux/macOS, Python and Node.js everywhere), including script paths and arguments with spaces
+- Animated GIF of the new-task flow in the README, recorded by `npm run screenshots`
 
 ### Changed
 

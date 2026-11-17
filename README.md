@@ -14,9 +14,13 @@ Everything is saved as standard VS Code tasks, so your tasks also work with **Ru
 
 > Formerly **Apache Ant Manager**. The extension ID, commands and settings are unchanged, so existing installs and tasks keep working.
 
-![Task Manager view in the Explorer and the task list](docs/screenshots/overview.png)
+![Creating a PowerShell task and running it with Save & Run](docs/screenshots/create-task.gif)
+
+*Creating a PowerShell task on Windows: pick the kind and the script, name it, add an argument, then **Save & Run**. The task appears in the Task Manager view and runs in the terminal.*
 
 ## Features
+
+![Task Manager view in the Explorer and the task list](docs/screenshots/overview.png)
 
 - **Task Manager view in the Explorer.** All your tasks in one place, grouped by workspace folder. Run or edit them inline; duplicate and delete them from the context menu.
 - **Ant targets.** The build file is parsed, including imports. Targets come with their descriptions and dependencies, and can be filtered and ordered by drag and drop or <kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd>. Expand an Ant task in the tree to run a single target.
@@ -29,6 +33,8 @@ Everything is saved as standard VS Code tasks, so your tasks also work with **Ru
 - **Safe with your `tasks.json`.** Comments, formatting and tasks the extension doesn't manage are preserved. A file that can't be parsed is never overwritten.
 
 ## Getting started
+
+*The screenshots show VS Code on Windows with the Default Dark Modern theme.*
 
 1. Open the **Task Manager** section in the Explorer and click **+** (or run **Task Manager: New Task…**).
 2. Choose what to run.
@@ -119,9 +125,30 @@ npm run compile          # bundle the extension with webpack
 | `npm run test:integration` | Integration tests inside a real VS Code, downloaded to `.vscode-test/`, against a copy of `test-fixtures/workspace`. |
 | `npm test` | Lint, then unit and integration tests |
 | `npm run test:e2e` | [Playwright](https://playwright.dev/) end-to-end tests that drive the VS Code UI: the Explorer view, quick picks and the webview editors |
-| `npm run screenshots` | Regenerates the images in `docs/screenshots/` from the sample workspace |
+| `npm run screenshots` | Regenerates the images and the animated GIF in `docs/screenshots/` from the sample workspace |
 
-On Linux without a display, prefix the VS Code-based suites with `xvfb-run -a`. The CI workflow runs all suites on Ubuntu and Windows.
+On Linux without a display, prefix the VS Code-based suites with `xvfb-run -a`. The CI workflow runs all suites on Ubuntu, Windows and macOS.
+
+#### Script tasks are run for real, on the OS you test on
+
+The integration tests (`src/test/integration/scripts.test.ts`) and the e2e tests (`e2e/platform.spec.ts`) create a task of each script kind, run it, and check the file the fixture script writes. The integration tests save each task to `tasks.json` and also run it with **Save & Run**. The e2e tests create each task in the editor. The argument (`prod eu`) contains a space, and so does the script folder used by the integration tests (`my scripts/`), so quoting is tested too. A kind that can't run on the current OS is reported as skipped, with the reason:
+
+| Kind | Windows | Linux / macOS |
+|------|---------|---------------|
+| Batch (`cmd.exe`) | ✅ | skipped |
+| PowerShell | ✅ `powershell.exe` | ✅ if `pwsh` is installed |
+| Shell (`bash`) | skipped | ✅ |
+| Python | ✅ if `python` is on `PATH` | ✅ if `python3` is on `PATH` |
+| Node.js | ✅ | ✅ |
+| Custom command (default shell) | ✅ PowerShell | ✅ bash/sh |
+
+#### Regenerating the README images
+
+`npm run screenshots` drives VS Code through the sample workspace and writes the PNGs and `create-task.gif`. The GIF is encoded in plain Node (no ffmpeg). By default the workspace is copied to the system temp folder, whose path (including your user name) shows up in the GIF. Set `E2E_WORKSPACE_ROOT` to a neutral folder that doesn't exist yet; it is created and removed afterwards:
+
+```powershell
+$env:E2E_WORKSPACE_ROOT = 'C:\demo'; npm run screenshots
+```
 
 ### Project structure
 
@@ -136,7 +163,7 @@ src/
 └── test/
     ├── unit/               # mocha + vscode stub
     └── integration/        # @vscode/test-cli
-e2e/                        # Playwright tests and screenshot generator
+e2e/                        # Playwright tests, screenshot and GIF generator
 test-fixtures/workspace/    # sample project used by the tests
 java/                       # optional Java-based Ant parser
 media/                      # webview CSS and codicons

@@ -70,11 +70,21 @@ export interface VSCode {
 
 export const test = base.extend<{ vscode: VSCode; workspaceDir: string }>({
     workspaceDir: async ({}, use) => {
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'task-manager-e2e-'));
-        const workspace = path.join(dir, 'sample-project');
+        // E2E_WORKSPACE_ROOT puts the workspace under a neutral path (e.g. C:\demo) for the
+        // README images, which would otherwise show the temp folder and the user name.
+        const root = process.env.E2E_WORKSPACE_ROOT;
+        const createdRoot = !!root && !fs.existsSync(root);
+        if (createdRoot) { fs.mkdirSync(root, { recursive: true }); }
+        const dir = root
+            ? fs.mkdtempSync(path.join(root, '.task-manager-e2e-'))
+            : fs.mkdtempSync(path.join(os.tmpdir(), 'task-manager-e2e-'));
+        const workspace = root ? path.join(root, 'sample-project') : path.join(dir, 'sample-project');
+        if (root && fs.existsSync(workspace)) { throw new Error(`${workspace} already exists`); }
         fs.cpSync(FIXTURE, workspace, { recursive: true });
         await use(workspace);
+        if (root) { fs.rmSync(workspace, { recursive: true, force: true, maxRetries: 5 }); }
         fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
+        if (createdRoot) { fs.rmSync(root, { recursive: true, force: true, maxRetries: 5 }); }
     },
 
     vscode: async ({ workspaceDir }, use, testInfo) => {

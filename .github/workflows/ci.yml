@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -47,16 +47,18 @@ jobs:
         if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:integration
 
-      - name: Integration tests (Windows)
-        if: runner.os == 'Windows'
+      # Each OS runs the script kinds it supports (see src/test/integration/scripts.test.ts):
+      # Batch and PowerShell on Windows, shell scripts (and pwsh where installed) elsewhere.
+      - name: Integration tests (Windows, macOS)
+        if: runner.os != 'Linux'
         run: npm run test:integration
 
       - name: End-to-end tests (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a npx playwright test --project=e2e
 
-      - name: End-to-end tests (Windows)
-        if: runner.os == 'Windows'
+      - name: End-to-end tests (Windows, macOS)
+        if: runner.os != 'Linux'
         run: npx playwright test --project=e2e
 
       - name: Upload Playwright report

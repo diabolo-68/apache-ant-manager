@@ -7,7 +7,7 @@ test.describe('Explorer view', () => {
         const view = await taskView(vscode.page);
         await expect(treeItem(view, 'Build')).toBeVisible();
         await expect(treeItem(view, 'Report')).toContainText('scripts/report.py');
-        await expect(treeItem(view, 'Hello')).toContainText('echo hello> hello.txt');
+        await expect(treeItem(view, 'Hello')).toContainText('echo hello > hello.txt');
 
         await treeItem(view, 'Build').click();
         for (const target of ['clean', 'dist']) {
@@ -151,11 +151,11 @@ test.describe('Script task editor', () => {
 
         const editor = await webview(page, '#command');
         await editor.locator('#taskName').fill('Write marker');
-        await editor.locator('#command').fill('echo done> marker.txt');
+        await editor.locator('#command').fill('echo done > marker.txt');
         await editor.locator('#saveRunBtn').click();
 
         await expect.poll(() => fs.existsSync(path.join(workspace, 'marker.txt')), { timeout: 20_000 }).toBe(true);
-        expect(readTasks(workspace).tasks.at(-1)).toMatchObject({ label: 'Write marker', type: 'shell', command: 'echo done> marker.txt' });
+        expect(readTasks(workspace).tasks.at(-1)).toMatchObject({ label: 'Write marker', type: 'shell', command: 'echo done > marker.txt' });
     });
 
     test('requires a command for custom tasks', async ({ vscode }) => {
