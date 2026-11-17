@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Package and publish the Task Manager extension to the VS Code Marketplace and OpenVSX.
+    Package and publish the Task Studio extension to the VS Code Marketplace and OpenVSX.
 .DESCRIPTION
     Builds the extension in production mode, packages it as a .vsix, and publishes
     that same .vsix to the VS Code Marketplace (via vsce) and OpenVSX (via ovsx).
@@ -37,7 +37,7 @@ $vsixFile = "$name-$version.vsix"
 
 Write-Host ''
 Write-Host '========================================' -ForegroundColor Cyan
-Write-Host "  Task Manager publish - v$version" -ForegroundColor Cyan
+Write-Host "  Task Studio publish - v$version" -ForegroundColor Cyan
 Write-Host '========================================' -ForegroundColor Cyan
 Write-Host ''
 

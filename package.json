@@ -1,6 +1,6 @@
 {
   "name": "apache-ant-manager",
-  "displayName": "Task Manager",
+  "displayName": "Task Studio — Scripts, Commands & More",
   "description": "Configure and run Apache Ant builds, shell, batch, PowerShell, Python and Node.js scripts, and custom commands as VS Code tasks — with a graphical UI",
   "version": "1.1.0",
   "publisher": "diabolo-68",
@@ -33,7 +33,7 @@
       "explorer": [
         {
           "id": "apacheAntManager.tasks",
-          "name": "Task Manager",
+          "name": "Task Studio",
           "icon": "$(tools)",
           "when": "workspaceFolderCount > 0"
         }
@@ -48,61 +48,61 @@
     "commands": [
       {
         "command": "apache-ant-manager.openConfiguration",
-        "title": "Open Task Manager",
-        "category": "Task Manager",
+        "title": "Open Task Studio",
+        "category": "Task Studio",
         "icon": "$(list-flat)"
       },
       {
         "command": "apache-ant-manager.selectBuildFile",
         "title": "New Task…",
-        "category": "Task Manager",
+        "category": "Task Studio",
         "icon": "$(add)"
       },
       {
         "command": "apache-ant-manager.createTaskFromFile",
         "title": "Create Task from This File",
-        "category": "Task Manager"
+        "category": "Task Studio"
       },
       {
         "command": "apache-ant-manager.runTargets",
         "title": "Run Task…",
-        "category": "Task Manager",
+        "category": "Task Studio",
         "icon": "$(play)"
       },
       {
         "command": "apache-ant-manager.rerunLastTask",
         "title": "Re-run Last Task",
-        "category": "Task Manager",
+        "category": "Task Studio",
         "icon": "$(debug-rerun)"
       },
       {
         "command": "apache-ant-manager.editTask",
         "title": "Edit Task…",
-        "category": "Task Manager",
+        "category": "Task Studio",
         "icon": "$(edit)"
       },
       {
         "command": "apache-ant-manager.duplicateTask",
         "title": "Duplicate Task…",
-        "category": "Task Manager",
+        "category": "Task Studio",
         "icon": "$(copy)"
       },
       {
         "command": "apache-ant-manager.deleteTask",
         "title": "Delete Task…",
-        "category": "Task Manager",
+        "category": "Task Studio",
         "icon": "$(trash)"
       },
       {
         "command": "apache-ant-manager.runSingleTarget",
         "title": "Run This Ant Target Only",
-        "category": "Task Manager",
+        "category": "Task Studio",
         "icon": "$(play)"
       },
       {
         "command": "apache-ant-manager.refresh",
         "title": "Refresh",
-        "category": "Task Manager",
+        "category": "Task Studio",
         "icon": "$(refresh)"
       }
     ],
@@ -193,7 +193,7 @@
       ]
     },
     "configuration": {
-      "title": "Task Manager",
+      "title": "Task Studio",
       "properties": {
         "apacheAntManager.antHome": {
           "type": "string",

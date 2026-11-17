@@ -26,7 +26,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (ref) { return ref; }
         const tasks = actions.getTasks();
         if (tasks.length === 0) {
-            vscode.window.showInformationMessage('No tasks yet. Use "Task Manager: New Task…" to create one.');
+            vscode.window.showInformationMessage('No tasks yet. Use "Task Studio: New Task…" to create one.');
             return undefined;
         }
         const multi = (vscode.workspace.workspaceFolders?.length ?? 0) > 1;
@@ -47,7 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
     const register = (id: string, fn: (...args: any[]) => unknown) =>
         context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-    // Open the task manager webview, or — from the Explorer context menu — a new task for that file.
+    // Open the Task Studio webview, or — from the Explorer context menu — a new task for that file.
     register('apache-ant-manager.openConfiguration', async (uri?: vscode.Uri) => {
         if (uri instanceof vscode.Uri) {
             if (!(await isAntBuildFile(uri.fsPath))) {

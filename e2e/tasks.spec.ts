@@ -33,7 +33,7 @@ test.describe('Explorer view', () => {
 
 test.describe('Task list', () => {
     test('shows every task with its kind and opens the editor on click', async ({ vscode }) => {
-        await runCommand(vscode.page, 'Task Manager: Open Task Manager');
+        await runCommand(vscode.page, 'Task Studio: Open Task Studio');
         const list = await webview(vscode.page, '.task-row');
         const rows = list.locator('.task-row');
         await expect(rows).toHaveCount(3);
@@ -50,7 +50,7 @@ test.describe('Task list', () => {
 test.describe('Ant task editor', () => {
     test('creates a task from the "New Task" flow', async ({ vscode }) => {
         const { page, workspace } = vscode;
-        await runCommand(page, 'Task Manager: New Task…');
+        await runCommand(page, 'Task Studio: New Task…');
         await pickQuickItem(page, 'Ant build');
         await expect(page.locator('.quick-input-widget .monaco-list-row', { hasText: 'modules' })).toBeVisible();
         await pickQuickItem(page, 'build.xml', ''); // unfiltered: the root build.xml is listed first
@@ -81,7 +81,7 @@ test.describe('Ant task editor', () => {
 
     test('validates the name and the target selection', async ({ vscode }) => {
         const { page } = vscode;
-        await runCommand(page, 'Task Manager: New Task…');
+        await runCommand(page, 'Task Studio: New Task…');
         await pickQuickItem(page, 'Ant build');
         await expect(page.locator('.quick-input-widget .monaco-list-row', { hasText: 'modules' })).toBeVisible();
         await pickQuickItem(page, 'build.xml', '');
@@ -101,7 +101,7 @@ test.describe('Ant task editor', () => {
 
     test('edits an existing task in place, keeping its arguments', async ({ vscode }) => {
         const { page, workspace } = vscode;
-        await runCommand(page, 'Task Manager: Edit Task…');
+        await runCommand(page, 'Task Studio: Edit Task…');
         await pickQuickItem(page, 'Build');
         const editor = await webview(page, '#targetList');
         await expect(editor.locator('#taskName')).toHaveValue('Build');
@@ -121,7 +121,7 @@ test.describe('Ant task editor', () => {
 test.describe('Script task editor', () => {
     test('creates a Python task that works on Linux and Windows', async ({ vscode }) => {
         const { page, workspace } = vscode;
-        await runCommand(page, 'Task Manager: New Task…');
+        await runCommand(page, 'Task Studio: New Task…');
         await pickQuickItem(page, 'Python script');
         await pickQuickItem(page, 'report.py');
 
@@ -146,7 +146,7 @@ test.describe('Script task editor', () => {
 
     test('creates a custom shell command and runs it with Save & Run', async ({ vscode }) => {
         const { page, workspace } = vscode;
-        await runCommand(page, 'Task Manager: New Task…');
+        await runCommand(page, 'Task Studio: New Task…');
         await pickQuickItem(page, 'Custom command');
 
         const editor = await webview(page, '#command');
@@ -160,7 +160,7 @@ test.describe('Script task editor', () => {
 
     test('requires a command for custom tasks', async ({ vscode }) => {
         const { page } = vscode;
-        await runCommand(page, 'Task Manager: New Task…');
+        await runCommand(page, 'Task Studio: New Task…');
         await pickQuickItem(page, 'Custom command');
         const editor = await webview(page, '#command');
         await editor.locator('#saveTaskBtn').click();

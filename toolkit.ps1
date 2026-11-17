@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Task Manager Developer Toolkit - interactive menu for testing, building, and publishing.
+    Task Studio Developer Toolkit - interactive menu for testing, building, and publishing.
 .DESCRIPTION
     Displays a menu to run the unit, integration and Playwright E2E tests, view results,
     regenerate the README screenshots, compile, package and publish the extension.
@@ -23,7 +23,7 @@ function Get-Version {
 
 function Show-Header {
     Clear-Host
-    $title = "Task Manager Developer Toolkit  v$(Get-Version)"
+    $title = "Task Studio Developer Toolkit  v$(Get-Version)"
     $width = [math]::Max(42, $title.Length + 6)
     $pad = $width - $title.Length
     $left = [math]::Floor($pad / 2)

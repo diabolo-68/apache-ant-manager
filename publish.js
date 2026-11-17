@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// publish.js - Package and publish Task Manager to the VS Code Marketplace and OpenVSX
+// publish.js - Package and publish Task Studio to the VS Code Marketplace and OpenVSX
 //
 // Usage:
 //   node publish.js                    # package + publish to both
@@ -57,7 +57,7 @@ const version = pkg.version;
 const vsixFile = `${pkg.name}-${version}.vsix`;
 const vsixPath = path.join(__dirname, vsixFile);
 
-header(`Task Manager publish - v${version}`);
+header(`Task Studio publish - v${version}`);
 
 // --- Pre-flight checks ---
 console.log('[check] Verifying tools...');

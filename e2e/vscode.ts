@@ -150,7 +150,7 @@ async function acceptQuickPick(page: Page, filter: string, label: string | RegEx
     await input.press('Enter');
 }
 
-/** Run a command from the command palette by its title (e.g. "Task Manager: New Task…"). */
+/** Run a command from the command palette by its title (e.g. "Task Studio: New Task…"). */
 export async function runCommand(page: Page, title: string): Promise<void> {
     await expect(async () => {
         // Focus can be left inside a webview that was just closed; key presses would then go
@@ -172,10 +172,10 @@ export async function pickQuickItem(page: Page, label: string, filter = label): 
     await acceptQuickPick(page, filter, label);
 }
 
-/** The "Task Manager" view in the Explorer, opened, expanded and focused. */
+/** The "Task Studio" view in the Explorer, opened, expanded and focused. */
 export async function taskView(page: Page): Promise<Locator> {
-    await runCommand(page, 'Explorer: Focus on Task Manager View');
-    const header = page.locator('.pane-header', { hasText: 'Task Manager' });
+    await runCommand(page, 'Explorer: Focus on Task Studio View');
+    const header = page.locator('.pane-header', { hasText: 'Task Studio' });
     await expect(header).toBeVisible();
     if (await header.getAttribute('aria-expanded') !== 'true') {
         await header.click();

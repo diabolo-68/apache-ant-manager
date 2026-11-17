@@ -62,7 +62,7 @@ test.describe(`Script tasks on ${process.platform}`, () => {
             const { page, workspace } = vscode;
             const out = path.join(workspace, `${c.kind}.out`);
 
-            await runCommand(page, 'Task Manager: New Task…');
+            await runCommand(page, 'Task Studio: New Task…');
             await pickQuickItem(page, c.pick);
             await pickQuickItem(page, c.file);
 

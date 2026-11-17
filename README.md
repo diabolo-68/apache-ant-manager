@@ -1,10 +1,10 @@
-# Task Manager for VS Code
+# Task Studio — Scripts, Commands & More
 
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/diabolo-68.apache-ant-manager?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=diabolo-68.apache-ant-manager)
 [![CI](https://github.com/diabolo-68/apache-ant-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/diabolo-68/apache-ant-manager/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Create, edit and run VS Code tasks with a form instead of hand-editing `tasks.json`. Task Manager handles:
+Create, edit and run VS Code tasks with a form instead of hand-editing `tasks.json`. Task Studio handles:
 
 - **Apache Ant builds**: pick and order targets, much like Eclipse's Ant launcher
 - **Scripts**: shell (bash, sh, zsh), Batch, PowerShell, Python and Node.js
@@ -16,13 +16,13 @@ Everything is saved as standard VS Code tasks, so your tasks also work with **Ru
 
 ![Creating a PowerShell task and running it with Save & Run](docs/screenshots/create-task.gif)
 
-*Creating a PowerShell task on Windows: pick the kind and the script, name it, add an argument, then **Save & Run**. The task appears in the Task Manager view and runs in the terminal.*
+*Creating a PowerShell task on Windows: pick the kind and the script, name it, add an argument, then **Save & Run**. The task appears in the Task Studio view and runs in the terminal.*
 
 ## Features
 
-![Task Manager view in the Explorer and the task list](docs/screenshots/overview.png)
+![Task Studio view in the Explorer and the task list](docs/screenshots/overview.png)
 
-- **Task Manager view in the Explorer.** All your tasks in one place, grouped by workspace folder. Run or edit them inline; duplicate and delete them from the context menu.
+- **Task Studio view in the Explorer.** All your tasks in one place, grouped by workspace folder. Run or edit them inline; duplicate and delete them from the context menu.
 - **Ant targets.** The build file is parsed, including imports. Targets come with their descriptions and dependencies, and can be filtered and ordered by drag and drop or <kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd>. Expand an Ant task in the tree to run a single target.
 - **Scripts.** Pick a script and enter its arguments one per line, with no quoting needed. The interpreter is suggested for you, including Python virtual environments in the workspace.
 - **Custom commands.** Run any program directly, or through the shell for pipes and `&&`.
@@ -36,7 +36,7 @@ Everything is saved as standard VS Code tasks, so your tasks also work with **Ru
 
 *The screenshots show VS Code on Windows with the Default Dark Modern theme.*
 
-1. Open the **Task Manager** section in the Explorer and click **+** (or run **Task Manager: New Task…**).
+1. Open the **Task Studio** section in the Explorer and click **+** (or run **Task Studio: New Task…**).
 2. Choose what to run.
 
    ![Choosing the kind of task](docs/screenshots/new-task.png)
@@ -73,12 +73,12 @@ Each entry also stores a small `taskManager` block, which lets the editor reopen
 
 ### Managing tasks
 
-![The Task Manager view](docs/screenshots/explorer-view.png)
+![The Task Studio view](docs/screenshots/explorer-view.png)
 
-- **Run.** Click ▶ next to a task, use **Task Manager: Run Task…**, VS Code's **Run Task**, or the re-run button in the status bar.
-- **Edit.** Click a script task, click the pencil icon on any task, or run **Task Manager: Edit Task…**.
+- **Run.** Click ▶ next to a task, use **Task Studio: Run Task…**, VS Code's **Run Task**, or the re-run button in the status bar.
+- **Edit.** Click a script task, click the pencil icon on any task, or run **Task Studio: Edit Task…**.
 - **Duplicate / Delete.** Use the context menu, or <kbd>Delete</kbd> in the view.
-- **Full-page list.** Run **Task Manager: Open Task Manager**.
+- **Full-page list.** Run **Task Studio: Open Task Studio**.
 
 ## Requirements
 
@@ -100,12 +100,12 @@ Each entry also stores a small `taskManager` block, which lets the editor reopen
 
 | Command | Description |
 |---------|-------------|
-| **Task Manager: New Task…** | Create an Ant, script or command task |
-| **Task Manager: Run Task…** | Pick a task and run it |
-| **Task Manager: Re-run Last Task** | Run the most recently run task again |
-| **Task Manager: Edit Task…** / **Duplicate Task…** / **Delete Task…** | Manage existing tasks |
-| **Task Manager: Open Task Manager** | Open the full-page task list |
-| **Task Manager: Refresh** | Reload tasks from `tasks.json` |
+| **Task Studio: New Task…** | Create an Ant, script or command task |
+| **Task Studio: Run Task…** | Pick a task and run it |
+| **Task Studio: Re-run Last Task** | Run the most recently run task again |
+| **Task Studio: Edit Task…** / **Duplicate Task…** / **Delete Task…** | Manage existing tasks |
+| **Task Studio: Open Task Studio** | Open the full-page task list |
+| **Task Studio: Refresh** | Reload tasks from `tasks.json` |
 
 ## Development
 

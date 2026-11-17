@@ -169,7 +169,7 @@ export class ScriptTaskService {
             { type: execution instanceof vscode.ShellExecution ? 'shell' : 'process' },
             folder ?? vscode.TaskScope.Workspace,
             spec.label,
-            'Task Manager',
+            'Task Studio',
             execution,
             []
         );

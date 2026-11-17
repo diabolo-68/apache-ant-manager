@@ -67,7 +67,7 @@ suite('Extension (integration)', () => {
         assert.match(text.replace(/\0/g, ''), /hello/); // PowerShell writes UTF-16
     });
 
-    test('opening the task manager shows a webview tab', async () => {
+    test('opening Task Studio shows a webview tab', async () => {
         await vscode.commands.executeCommand('apache-ant-manager.openConfiguration');
         const tab = await waitFor(() => vscode.window.tabGroups.all
             .flatMap(g => g.tabs)

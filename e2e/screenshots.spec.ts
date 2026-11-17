@@ -37,7 +37,7 @@ test('overview: Explorer view and task list', async ({ vscode }) => {
     await treeItem(view, 'Build').click();
     await expect(treeItem(view, 'dist')).toBeVisible();
 
-    await runCommand(page, 'Task Manager: Open Task Manager');
+    await runCommand(page, 'Task Studio: Open Task Studio');
     await webview(page, '.task-row');
     await settle(page);
     await page.screenshot({ path: path.join(OUT, 'overview.png') });
@@ -48,7 +48,7 @@ test('new task: choose a kind', async ({ vscode }) => {
     const { page } = vscode;
     await collapseFileExplorer(page);
     await taskView(page);
-    await runCommand(page, 'Task Manager: New Task…');
+    await runCommand(page, 'Task Studio: New Task…');
     await expect(page.locator('.quick-input-widget .monaco-list-row', { hasText: 'Python script' })).toBeVisible();
     await settle(page);
     await page.screenshot({ path: path.join(OUT, 'new-task.png') });
@@ -58,7 +58,7 @@ test('Ant task editor', async ({ vscode }) => {
     const { page } = vscode;
     await collapseFileExplorer(page);
     await taskView(page);
-    await runCommand(page, 'Task Manager: Edit Task…');
+    await runCommand(page, 'Task Studio: Edit Task…');
     await pickQuickItem(page, 'Build');
     const editor = await webview(page, '#targetList');
     await editor.locator('.target-row[data-name="test"]').click();
@@ -70,7 +70,7 @@ test('script task editor', async ({ vscode }) => {
     const { page } = vscode;
     await collapseFileExplorer(page);
     await taskView(page);
-    await runCommand(page, 'Task Manager: Edit Task…');
+    await runCommand(page, 'Task Studio: Edit Task…');
     await pickQuickItem(page, 'Report');
     await webview(page, '#scriptArgs');
     await settle(page);
@@ -91,7 +91,7 @@ test('animated GIF: creating and running a task', async ({ vscode }) => {
     gif.start();
     await gif.pause(1000);
 
-    // + in the Task Manager view title
+    // + in the Task Studio view title
     await gif.moveTo(view.locator('.pane-header'));
     await gif.click(view.locator('.pane-header .action-label[aria-label^="New Task"]'));
     const row = (label: string) => page.locator('.quick-input-widget .monaco-list-row', { hasText: label });
