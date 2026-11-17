@@ -34,6 +34,10 @@ $pkg = Get-Content .\package.json -Raw | ConvertFrom-Json
 $version = $pkg.version
 $name = $pkg.name
 $vsixFile = "$name-$version.vsix"
+# README images are excluded from the .vsix (docs/** in .vscodeignore), so the
+# Marketplace and OpenVSX load them from GitHub. Point straight at the raw host
+# on main instead of the default github.com/.../raw/HEAD redirect.
+$baseImagesUrl = 'https://raw.githubusercontent.com/diabolo-68/apache-ant-manager/main/'
 
 Write-Host ''
 Write-Host '========================================' -ForegroundColor Cyan
@@ -98,7 +102,7 @@ if ($gitStatus) {
 
 # --- Package (vscode:prepublish runs the production webpack build) ---
 Write-Host "[1/3] Packaging $vsixFile ..." -ForegroundColor Green
-& npx --no-install @vscode/vsce package --no-git-tag-version --out $vsixFile
+& npx --no-install @vscode/vsce package --no-git-tag-version --baseImagesUrl $baseImagesUrl --out $vsixFile
 if ($LASTEXITCODE -ne 0) {
     Write-Host 'ERROR: vsce package failed.' -ForegroundColor Red
     exit 1

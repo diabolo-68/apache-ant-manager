@@ -55,6 +55,10 @@ function header(text) {
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
 const version = pkg.version;
 const vsixFile = `${pkg.name}-${version}.vsix`;
+// README images are excluded from the .vsix (docs/** in .vscodeignore), so the
+// Marketplace and OpenVSX load them from GitHub. Point straight at the raw host
+// on main instead of vsce's default github.com/.../raw/HEAD redirect.
+const BASE_IMAGES_URL = 'https://raw.githubusercontent.com/diabolo-68/apache-ant-manager/main/';
 const vsixPath = path.join(__dirname, vsixFile);
 
 header(`Task Studio publish - v${version}`);
@@ -109,7 +113,7 @@ try {
 // --- Package (vscode:prepublish runs the production webpack build) ---
 try {
     console.log(`[1/3] Packaging ${vsixFile} ...`);
-    npx(['@vscode/vsce', 'package', '--no-git-tag-version', '--out', vsixFile]);
+    npx(['@vscode/vsce', 'package', '--no-git-tag-version', '--baseImagesUrl', BASE_IMAGES_URL, '--out', vsixFile]);
     if (!fs.existsSync(vsixPath)) {
         fail(`ERROR: Expected ${vsixFile} not found after packaging.`);
     }
