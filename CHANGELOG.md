@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the "Apache Ant Manager" extension will be documented in this file.
+All notable changes to the "Task Manager" extension (formerly "Apache Ant Manager") will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New-task flow lists matching files found in the workspace
 
 ### Changed
+
+- Renamed to **Task Manager** (extension ID, command IDs and `apacheAntManager.*` settings are unchanged, so existing installs and tasks keep working)
 
 - Redesigned Ant task editor: single filterable target list with drag-and-drop ordering, structured arguments, collapsible environment section, inline validation, sticky action bar
 - Task list grouped by workspace folder with relative paths and hover actions

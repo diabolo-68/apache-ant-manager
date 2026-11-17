@@ -80,9 +80,9 @@ export class AntTasksListPanel {
             const short = (p: string) => p.replace(/^\$\{workspaceFolder(?::[^}]+)?\}[\\/]?/, '');
             const args = meta.scriptArgs?.length ? `<span>${icon('symbol-parameter')}${escapeHtml(meta.scriptArgs.join(' '))}</span>` : '';
             const main = meta.kind === 'custom'
-                ? `<span>${icon('terminal')}<code>${escapeHtml(task.command)}</code></span>`
+                ? `<span>${icon('terminal')}<code>${escapeHtml(this._taskService.effectiveCommand(task))}</code></span>`
                 : `<span title="${escapeHtml(meta.script)}">${icon('file-code')}${escapeHtml(short(meta.script))}</span>
-                   <span title="Interpreter">${icon('run')}${escapeHtml(task.command)}</span>`;
+                   <span title="Interpreter">${icon('run')}${escapeHtml(this._taskService.effectiveCommand(task))}</span>`;
             return { icon: info.icon, badge: info.shortLabel, details: main + args };
         }
         const parsed = this._taskService.parseAntTask(task);

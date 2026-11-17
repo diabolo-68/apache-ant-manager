@@ -1,4 +1,4 @@
-# Apache Ant Manager
+# Task Manager (formerly Apache Ant Manager)
 
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/diabolo-68.apache-ant-manager?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=diabolo-68.apache-ant-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -35,7 +35,7 @@ A Visual Studio Code extension that provides a graphical UI for configuring and 
 
 1. Open VS Code
 2. Go to Extensions (Ctrl+Shift+X)
-3. Search for "Apache Ant Manager"
+3. Search for "Task Manager" (publisher diabolo-68)
 4. Click **Install**
 
 ### From Source

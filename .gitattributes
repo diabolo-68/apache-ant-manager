@@ -1,0 +1,18 @@
+# Normalise line endings: LF in the repository and in working trees on every OS,
+# so Windows and Linux checkouts produce identical files (and no spurious diffs).
+* text=auto eol=lf
+
+# Windows batch files must keep CRLF or cmd.exe misparses labels/GOTO.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.jar binary
+*.vsix binary

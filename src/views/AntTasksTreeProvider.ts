@@ -60,7 +60,7 @@ export class AntTasksTreeProvider implements vscode.TreeDataProvider<AntTreeNode
         item.id = `task:${ref.folderName}:${ref.label}`;
         item.contextValue = 'scriptTask';
 
-        const commandLine = [task.command, ...(meta.kind === 'custom' ? meta.scriptArgs : [])].join(' ');
+        const commandLine = [this._taskService.effectiveCommand(task), ...(meta.kind === 'custom' ? meta.scriptArgs : [])].join(' ');
         if (meta.kind !== 'custom' && meta.script) {
             // Use the file icon theme (Python, PowerShell, … icons) for script files.
             item.resourceUri = vscode.Uri.file(this._taskService.resolveWorkspacePath(meta.script));
@@ -73,7 +73,7 @@ export class AntTasksTreeProvider implements vscode.TreeDataProvider<AntTreeNode
 
         const md = new vscode.MarkdownString();
         md.appendMarkdown(`**${task.label}** — ${info.label}\n\n`);
-        const full = [task.command, ...(task.args ?? [])].join(' ');
+        const full = [this._taskService.effectiveCommand(task), ...(task.args ?? [])].join(' ');
         md.appendCodeblock(full, 'shell');
         if (task.options?.cwd) { md.appendMarkdown(`Working directory: \`${task.options.cwd}\``); }
         item.tooltip = md;

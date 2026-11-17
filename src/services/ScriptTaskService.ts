@@ -4,14 +4,17 @@ import * as path from 'path';
 import { AntTaskConfig, AntTaskService } from './AntTaskService';
 import { SCRIPT_KINDS, ScriptKind, ScriptTaskSpec, TaskManagerMeta } from '../types/taskKinds';
 
-const isWindows = process.platform === 'win32';
-
 /**
  * Converts between the script task editor's model (ScriptTaskSpec) and tasks.json entries,
  * and runs specs directly.
  */
 export class ScriptTaskService {
-    constructor(private readonly _taskService: AntTaskService) {}
+    private readonly _isWindows: boolean;
+
+    /** `platform` is injectable so the Windows and Linux code paths can be unit-tested on any OS. */
+    constructor(private readonly _taskService: AntTaskService, platform: NodeJS.Platform = process.platform) {
+        this._isWindows = platform === 'win32';
+    }
 
     /** Default spec for a new task of the given kind, optionally for a given script file. */
     defaultSpec(kind: ScriptKind, scriptPath?: string): ScriptTaskSpec {
@@ -20,8 +23,8 @@ export class ScriptTaskService {
         return {
             kind,
             label: baseName ? `${info.shortLabel}: ${baseName}` : (kind === 'custom' ? 'My command' : `${info.shortLabel} task`),
-            interpreter: info.defaultInterpreter(isWindows),
-            interpreterArgs: info.defaultInterpreterArgs(isWindows),
+            interpreter: info.defaultInterpreter(this._isWindows),
+            interpreterArgs: info.defaultInterpreterArgs(this._isWindows),
             script: scriptPath ?? '',
             scriptArgs: [],
             useShell: kind === 'custom',
@@ -43,7 +46,7 @@ export class ScriptTaskService {
         // Batch tasks are stored as shell tasks running cmd.exe (see toTaskConfig).
         const interpreter = meta.kind === 'batch'
             ? (task.options?.shell?.executable || 'cmd.exe')
-            : (task.command || '');
+            : ((this._isWindows && task.windows?.command) || task.command || '');
         return {
             kind: meta.kind,
             label: task.label,
@@ -100,6 +103,15 @@ export class ScriptTaskService {
             presentation: { reveal: spec.reveal, panel: spec.panel, clear: spec.clear },
             taskManager: meta
         };
+        // The default interpreter differs per OS (python3 / python, pwsh / powershell.exe): store the
+        // Linux/macOS name and a `windows` override, so one tasks.json works on every platform.
+        const winDefault = info.defaultInterpreter(true);
+        const posixDefault = info.defaultInterpreter(false);
+        if (!isCustom && spec.kind !== 'batch' && winDefault !== posixDefault
+            && spec.interpreter.trim() === info.defaultInterpreter(this._isWindows)) {
+            config.command = posixDefault;
+            config.windows = { command: winDefault };
+        }
         if (spec.kind === 'batch') {
             // cmd.exe's /c quote handling breaks with process tasks when paths contain spaces;
             // VS Code's shell tasks quote correctly for cmd, so run the script as a shell command.
@@ -177,10 +189,12 @@ export class ScriptTaskService {
      */
     interpreterSuggestions(kind: ScriptKind, folder?: vscode.WorkspaceFolder): string[] {
         const fixed: Record<ScriptKind, string[]> = {
-            bash: ['bash', 'sh', 'zsh', 'dash'],
+            bash: this._isWindows
+                ? ['bash', 'C:\\Program Files\\Git\\bin\\bash.exe', 'wsl.exe']
+                : ['bash', 'sh', 'zsh', 'dash'],
             batch: ['cmd.exe'],
             powershell: ['pwsh', 'powershell.exe'],
-            python: isWindows ? ['python', 'py', 'python3'] : ['python3', 'python'],
+            python: this._isWindows ? ['python', 'py', 'python3'] : ['python3', 'python'],
             node: ['node', 'bun', 'deno'],
             custom: ['make', 'gradle', 'mvn', 'npm', 'docker']
         };
@@ -191,7 +205,7 @@ export class ScriptTaskService {
             const roots = folder ? [folder] : (vscode.workspace.workspaceFolders ?? []);
             for (const root of roots) {
                 for (const venv of ['.venv', 'venv', 'env']) {
-                    const candidates = isWindows
+                    const candidates = this._isWindows
                         ? [path.join(root.uri.fsPath, venv, 'Scripts', 'python.exe')]
                         : [path.join(root.uri.fsPath, venv, 'bin', 'python')];
                     for (const c of candidates) {

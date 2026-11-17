@@ -23,13 +23,22 @@ export class AntParserService {
             return value;
         }
         
-        // Resolve ${workspaceFolder}
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders && workspaceFolders.length > 0) {
-            value = value.replace(/\$\{workspaceFolder\}/g, workspaceFolders[0].uri.fsPath);
+        const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+        // ${workspaceFolder:NAME} (multi-root) and ${workspaceFolder} (first folder)
+        value = value.replace(/\$\{workspaceFolder:([^}]+)\}/g, (match, name: string) =>
+            workspaceFolders.find(f => f.name === name)?.uri.fsPath ?? match);
+        if (workspaceFolders.length > 0) {
+            value = value.replace(/\$\{workspaceFolder\}/g, () => workspaceFolders[0].uri.fsPath);
         }
-        
-        return value;
+        // ${env:NAME}
+        value = value.replace(/\$\{env:([^}]+)\}/g, (_m, name: string) => process.env[name] ?? '');
+        return path.normalize(value);
+    }
+
+    /** Value of an XML attribute in an attribute list (whole-word match, so `if` does not match `unless`'s value). */
+    private static attr(attrs: string, name: string): string | undefined {
+        const m = attrs.match(new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i'));
+        return m ? (m[1] ?? m[2]) : undefined;
     }
 
     /**
@@ -197,13 +206,13 @@ export class AntParserService {
             const projectMatch = content.match(/<project\s+([^>]*)>/i);
             if (projectMatch) {
                 const attrs = projectMatch[1];
-                const nameMatch = attrs.match(/name\s*=\s*["']([^"']*)["']/i);
-                const defaultMatch = attrs.match(/default\s*=\s*["']([^"']*)["']/i);
-                const basedirMatch = attrs.match(/basedir\s*=\s*["']([^"']*)["']/i);
+                const name = AntParserService.attr(attrs, 'name');
+                const def = AntParserService.attr(attrs, 'default');
+                const basedir = AntParserService.attr(attrs, 'basedir');
 
-                if (nameMatch) {buildInfo.projectName = nameMatch[1];}
-                if (defaultMatch) {buildInfo.defaultTarget = defaultMatch[1];}
-                if (basedirMatch) {buildInfo.baseDir = path.resolve(fileDir, basedirMatch[1]);}
+                if (name !== undefined) {buildInfo.projectName = name;}
+                if (def !== undefined) {buildInfo.defaultTarget = def;}
+                if (basedir !== undefined) {buildInfo.baseDir = path.resolve(fileDir, basedir);}
             }
         }
 
@@ -213,27 +222,21 @@ export class AntParserService {
 
         while ((targetMatch = targetRegex.exec(content)) !== null) {
             const attrs = targetMatch[1];
-            const nameMatch = attrs.match(/name\s*=\s*["']([^"']*)["']/i);
-            
-            if (nameMatch) {
-                const targetName = nameMatch[1];
-                
+            const targetName = AntParserService.attr(attrs, 'name');
+
+            if (targetName) {
                 // Skip if target with same name already exists (imported targets can be overridden)
                 if (buildInfo.targets.some(t => t.name === targetName)) {
                     continue;
                 }
 
-                const descMatch = attrs.match(/description\s*=\s*["']([^"']*)["']/i);
-                const dependsMatch = attrs.match(/depends\s*=\s*["']([^"']*)["']/i);
-                const ifMatch = attrs.match(/if\s*=\s*["']([^"']*)["']/i);
-                const unlessMatch = attrs.match(/unless\s*=\s*["']([^"']*)["']/i);
-
+                const depends = AntParserService.attr(attrs, 'depends');
                 buildInfo.targets.push({
                     name: targetName,
-                    description: descMatch ? descMatch[1] : null,
-                    dependencies: dependsMatch ? dependsMatch[1].split(',').map(d => d.trim()) : [],
-                    ifCondition: ifMatch ? ifMatch[1] : null,
-                    unlessCondition: unlessMatch ? unlessMatch[1] : null,
+                    description: AntParserService.attr(attrs, 'description') ?? null,
+                    dependencies: depends ? depends.split(',').map(d => d.trim()).filter(Boolean) : [],
+                    ifCondition: AntParserService.attr(attrs, 'if') ?? null,
+                    unlessCondition: AntParserService.attr(attrs, 'unless') ?? null,
                     isDefault: targetName === buildInfo.defaultTarget
                 });
             }
@@ -246,10 +249,10 @@ export class AntParserService {
 
             while ((importMatch = importRegex.exec(content)) !== null) {
                 const attrs = importMatch[1];
-                const fileAttrMatch = attrs.match(/file\s*=\s*["']([^"']*)["']/i);
-                
-                if (fileAttrMatch) {
-                    let importPath = fileAttrMatch[1];
+                let importPath = AntParserService.attr(attrs, 'file');
+
+                // Ant properties (${basedir}, ${ant.file.x}) cannot be resolved without Ant; skip those imports.
+                if (importPath && !importPath.includes('${')) {
                     
                     // Resolve relative paths
                     if (!path.isAbsolute(importPath)) {

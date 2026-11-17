@@ -34,7 +34,7 @@ export function activate(context: vscode.ExtensionContext) {
             tasks.map(t => ({
                 label: `$(${t.taskManager ? SCRIPT_KINDS[t.taskManager.kind]?.icon ?? 'terminal' : 'tools'}) ${t.label}`,
                 description: t.taskManager
-                    ? [t.command, ...(t.args ?? [])].join(' ')
+                    ? [taskService.effectiveCommand(t), ...(t.args ?? [])].join(' ')
                     : taskService.parseAntTask(t).targets?.join(' → ') || '',
                 detail: multi ? taskRefOf(t).folderName.replace('__workspace__', 'Workspace (shared)') : undefined,
                 ref: taskRefOf(t)
