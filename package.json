@@ -2,7 +2,7 @@
   "name": "apache-ant-manager",
   "displayName": "Task Manager",
   "description": "Configure and run Apache Ant builds, shell, batch, PowerShell, Python and Node.js scripts, and custom commands as VS Code tasks — with a graphical UI",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "diabolo-68",
   "author": {
     "name": "diabolo-68"

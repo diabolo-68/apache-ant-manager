@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-17
+
 ### Added
 
 - **Script and command tasks** - Create tasks for shell, batch, PowerShell, Python and Node.js scripts, and custom commands, with interpreter suggestions (incl. Python virtual environments), arguments, environment variables, terminal and task-group options
@@ -17,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test suites: unit tests (mocha), integration tests in VS Code (@vscode/test-cli) and Playwright end-to-end tests, run on Linux, Windows and macOS in CI
 - Platform tests that create and run every script kind the current OS supports (Batch and PowerShell on Windows, shell scripts on Linux/macOS, Python and Node.js everywhere), including script paths and arguments with spaces
 - Animated GIF of the new-task flow in the README, recorded by `npm run screenshots`
+- Publishing scripts (`publish.ps1`, `publish.js`, `npm run publish:*`) that package one `.vsix` and publish it to the VS Code Marketplace and OpenVSX, plus `toolkit.ps1`, an interactive menu for tests, screenshots, packaging and publishing
 
 ### Changed
 
@@ -69,12 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## Planned
 
-### Planned
-
-- Drag-and-drop target reordering
-- Target filtering and search
 - Build file templates
 - Recent build files history
-- Keyboard shortcuts
