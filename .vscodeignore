@@ -26,3 +26,10 @@ java/src/**
 java/pom.xml
 java/dependency-reduced-pom.xml
 *.vsix
+toolkit.ps1
+publish.js
+publish.ps1
+test-output.txt
+playwright-output.txt
+java/target/**
+!java/target/ant-parser.jar

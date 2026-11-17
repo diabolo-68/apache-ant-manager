@@ -117,6 +117,19 @@ npm run compile          # bundle the extension with webpack
 # press F5 in VS Code to start an Extension Development Host
 ```
 
+On Windows, `.\toolkit.ps1` opens an interactive menu to run the tests, view results, regenerate the screenshots, and package or publish the extension.
+
+### Publishing
+
+`publish.ps1` (or `node publish.js` on any OS) packages the extension and publishes that same `.vsix` to the VS Code Marketplace and OpenVSX. Tokens are read from the `VSCE_PAT` and `OVSX_PAT` environment variables. The Java parser jar must be built first (`mvn -f java/pom.xml package`) because it ships in the package.
+
+```powershell
+.\publish.ps1 -DryRun                            # package only
+.\publish.ps1 [-SkipMarketplace] [-SkipOpenVSX] [-Force]
+npm run publish:dry                              # same, via publish.js
+npm run publish:all | publish:marketplace | publish:openvsx
+```
+
 ### Tests
 
 | Command | What it runs |

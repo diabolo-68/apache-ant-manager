@@ -235,7 +235,11 @@
     "test:integration": "vscode-test",
     "test:e2e": "npm run compile && playwright test --project=e2e",
     "screenshots": "npm run compile && playwright test --project=screenshots",
-    "test:all": "npm test && npm run test:e2e"
+    "test:all": "npm test && npm run test:e2e",
+    "publish:all": "node publish.js",
+    "publish:dry": "node publish.js --dry-run",
+    "publish:marketplace": "node publish.js --skip-openvsx",
+    "publish:openvsx": "node publish.js --skip-marketplace"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
@@ -245,9 +249,11 @@
     "@types/vscode": "^1.96.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^4.1.1",
     "eslint": "^9.0.0",
     "gifenc": "^1.0.3",
     "mocha": "^11.8.0",
+    "ovsx": "^1.4.0",
     "pngjs": "^7.0.0",
     "ts-loader": "^9.5.4",
     "typescript": "^5.7.0",
