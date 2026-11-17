@@ -14,15 +14,15 @@
       "preLaunchTask": "watch-apache-ant-manager"
     },
     {
-      "name": "Extension Tests",
+      "name": "Run Extension (sample workspace)",
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}",
-        "--extensionTestsPath=${workspaceFolder}/out/test/suite/index"
+        "${workspaceFolder}/test-fixtures/workspace",
+        "--extensionDevelopmentPath=${workspaceFolder}"
       ],
       "outFiles": [
-        "${workspaceFolder}/dist/test/**/*.js"
+        "${workspaceFolder}/dist/**/*.js"
       ],
       "preLaunchTask": "watch-apache-ant-manager"
     }

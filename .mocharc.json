@@ -1,0 +1,6 @@
+{
+    "ui": "tdd",
+    "require": ["out/test/unit/setup.js"],
+    "spec": ["out/test/unit/**/*.test.js"],
+    "timeout": 10000
+}

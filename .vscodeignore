@@ -12,3 +12,17 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
+e2e/**
+test-fixtures/**
+docs/**
+playwright.config.ts
+playwright-report/**
+test-results/**
+.mocharc.json
+.editorconfig
+.gitattributes
+.github/**
+java/src/**
+java/pom.xml
+java/dependency-reduced-pom.xml
+*.vsix

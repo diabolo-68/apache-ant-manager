@@ -5,8 +5,33 @@
       "label": "watch-apache-ant-manager",
       "type": "npm",
       "script": "watch",
-      "problemMatcher": "$ts-webpack-watch",
       "isBackground": true,
+      // Inline matcher (works in VS Code and VSCodium without extra extensions).
+      // The begin/end markers are printed by the plugin in webpack.config.js.
+      "problemMatcher": {
+        "owner": "typescript",
+        "source": "ts",
+        "fileLocation": "absolute",
+        "pattern": [
+          {
+            "regexp": "^\\[tsl\\] (ERROR|WARNING) in (.*)\\((\\d+),(\\d+)\\)$",
+            "severity": 1,
+            "file": 2,
+            "line": 3,
+            "column": 4
+          },
+          {
+            "regexp": "^\\s*TS(\\d+):\\s*(.*)$",
+            "code": 1,
+            "message": 2
+          }
+        ],
+        "background": {
+          "activeBegin": true,
+          "beginsPattern": "\\[watch\\] build started",
+          "endsPattern": "\\[watch\\] build finished"
+        }
+      },
       "presentation": {
         "reveal": "never"
       },
@@ -16,9 +41,28 @@
       }
     },
     {
+      "label": "compile",
       "type": "npm",
       "script": "compile",
-      "problemMatcher": "$ts-webpack",
+      "problemMatcher": {
+        "owner": "typescript",
+        "source": "ts",
+        "fileLocation": "absolute",
+        "pattern": [
+          {
+            "regexp": "^\\[tsl\\] (ERROR|WARNING) in (.*)\\((\\d+),(\\d+)\\)$",
+            "severity": 1,
+            "file": 2,
+            "line": 3,
+            "column": 4
+          },
+          {
+            "regexp": "^\\s*TS(\\d+):\\s*(.*)$",
+            "code": 1,
+            "message": 2
+          }
+        ]
+      },
       "group": "build"
     }
   ]

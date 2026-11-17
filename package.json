@@ -1,7 +1,7 @@
 {
   "name": "apache-ant-manager",
-  "displayName": "Apache Ant Manager",
-  "description": "Configure and manage Apache Ant tasks with a graphical UI similar to Eclipse",
+  "displayName": "Task Manager",
+  "description": "Configure and run Apache Ant builds, shell, batch, PowerShell, Python and Node.js scripts, and custom commands as VS Code tasks — with a graphical UI",
   "version": "1.0.0",
   "publisher": "diabolo-68",
   "author": {
@@ -24,47 +24,176 @@
     "Other"
   ],
   "activationEvents": [
-    "workspaceContains:**/build.xml"
+    "workspaceContains:**/build.xml",
+    "workspaceContains:.vscode/tasks.json"
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "apacheAntManager.tasks",
+          "name": "Task Manager",
+          "icon": "$(tools)",
+          "when": "workspaceFolderCount > 0"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "apacheAntManager.tasks",
+        "contents": "No tasks yet.\nTurn an Ant build, a script (shell, batch, PowerShell, Python, Node.js) or any command into a reusable VS Code task.\n[$(add) New Task](command:apache-ant-manager.selectBuildFile)"
+      }
+    ],
     "commands": [
       {
         "command": "apache-ant-manager.openConfiguration",
-        "title": "Open Ant Configuration",
-        "category": "Ant",
-        "icon": "$(settings-gear)"
+        "title": "Open Task Manager",
+        "category": "Task Manager",
+        "icon": "$(list-flat)"
       },
       {
         "command": "apache-ant-manager.selectBuildFile",
-        "title": "Select Ant Build File",
-        "category": "Ant",
-        "icon": "$(file-code)"
+        "title": "New Task…",
+        "category": "Task Manager",
+        "icon": "$(add)"
+      },
+      {
+        "command": "apache-ant-manager.createTaskFromFile",
+        "title": "Create Task from This File",
+        "category": "Task Manager"
       },
       {
         "command": "apache-ant-manager.runTargets",
-        "title": "Run Ant Targets",
-        "category": "Ant",
+        "title": "Run Task…",
+        "category": "Task Manager",
+        "icon": "$(play)"
+      },
+      {
+        "command": "apache-ant-manager.rerunLastTask",
+        "title": "Re-run Last Task",
+        "category": "Task Manager",
+        "icon": "$(debug-rerun)"
+      },
+      {
+        "command": "apache-ant-manager.editTask",
+        "title": "Edit Task…",
+        "category": "Task Manager",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "apache-ant-manager.duplicateTask",
+        "title": "Duplicate Task…",
+        "category": "Task Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "apache-ant-manager.deleteTask",
+        "title": "Delete Task…",
+        "category": "Task Manager",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "apache-ant-manager.runSingleTarget",
+        "title": "Run This Ant Target Only",
+        "category": "Task Manager",
         "icon": "$(play)"
       },
       {
         "command": "apache-ant-manager.refresh",
         "title": "Refresh",
-        "category": "Ant",
+        "category": "Task Manager",
         "icon": "$(refresh)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "apache-ant-manager.deleteTask",
+        "key": "delete",
+        "mac": "cmd+backspace",
+        "when": "focusedView == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/"
       }
     ],
     "menus": {
       "explorer/context": [
         {
-          "when": "resourceExtname == .xml",
-          "command": "apache-ant-manager.openConfiguration",
+          "when": "resourceExtname =~ /^\\.(xml|sh|bash|bat|cmd|ps1|py|js|mjs|cjs)$/i",
+          "command": "apache-ant-manager.createTaskFromFile",
           "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "apache-ant-manager.selectBuildFile",
+          "when": "view == apacheAntManager.tasks",
+          "group": "navigation@1"
+        },
+        {
+          "command": "apache-ant-manager.refresh",
+          "when": "view == apacheAntManager.tasks",
+          "group": "navigation@2"
+        },
+        {
+          "command": "apache-ant-manager.openConfiguration",
+          "when": "view == apacheAntManager.tasks",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "apache-ant-manager.runTargets",
+          "when": "view == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/",
+          "group": "inline@1"
+        },
+        {
+          "command": "apache-ant-manager.editTask",
+          "when": "view == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/",
+          "group": "inline@2"
+        },
+        {
+          "command": "apache-ant-manager.runTargets",
+          "when": "view == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/",
+          "group": "1_run@1"
+        },
+        {
+          "command": "apache-ant-manager.editTask",
+          "when": "view == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/",
+          "group": "2_edit@1"
+        },
+        {
+          "command": "apache-ant-manager.duplicateTask",
+          "when": "view == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/",
+          "group": "2_edit@2"
+        },
+        {
+          "command": "apache-ant-manager.deleteTask",
+          "when": "view == apacheAntManager.tasks && viewItem =~ /^(antTask|scriptTask)$/",
+          "group": "3_delete@1"
+        },
+        {
+          "command": "apache-ant-manager.runSingleTarget",
+          "when": "view == apacheAntManager.tasks && viewItem == antTarget",
+          "group": "inline@1"
+        },
+        {
+          "command": "apache-ant-manager.runSingleTarget",
+          "when": "view == apacheAntManager.tasks && viewItem == antTarget",
+          "group": "1_run@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "apache-ant-manager.runSingleTarget",
+          "when": "false"
+        },
+        {
+          "command": "apache-ant-manager.createTaskFromFile",
+          "when": "false"
         }
       ]
     },
     "configuration": {
-      "title": "Apache Ant Manager",
+      "title": "Task Manager",
       "properties": {
         "apacheAntManager.antHome": {
           "type": "string",
@@ -96,21 +225,49 @@
     "compile": "webpack",
     "watch": "webpack --watch",
     "package": "webpack --mode production --devtool hidden-source-map",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test"
+    "compile-tests": "tsc -p .",
+    "watch-tests": "tsc -p . -w",
+    "lint": "eslint src e2e",
+    "typecheck": "tsc -p . --noEmit && tsc -p e2e --noEmit",
+    "pretest": "npm run compile && npm run compile-tests && npm run lint",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "mocha",
+    "test:integration": "vscode-test",
+    "test:e2e": "npm run compile && playwright test --project=e2e",
+    "screenshots": "npm run compile && playwright test --project=screenshots",
+    "test:all": "npm test && npm run test:e2e"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^22.0.0",
+    "@types/pngjs": "^6.0.5",
     "@types/vscode": "^1.96.0",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
     "eslint": "^9.0.0",
+    "gifenc": "^1.0.3",
+    "mocha": "^11.8.0",
+    "pngjs": "^7.0.0",
     "ts-loader": "^9.5.4",
     "typescript": "^5.7.0",
+    "typescript-eslint": "^8.18.2",
     "webpack": "^5.105.2",
     "webpack-cli": "^5.1.4"
+  },
+  "keywords": [
+    "ant",
+    "apache ant",
+    "tasks",
+    "task runner",
+    "build",
+    "scripts",
+    "bash",
+    "powershell",
+    "batch",
+    "python"
+  ],
+  "dependencies": {
+    "jsonc-parser": "^3.3.1"
   }
 }

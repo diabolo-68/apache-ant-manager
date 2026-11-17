@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as jsonc from 'jsonc-parser';
+import { TaskKind, TaskManagerMeta } from '../types/taskKinds';
 
 /**
  * Represents an Ant task configuration stored in tasks.json
@@ -18,9 +20,15 @@ export interface AntTaskConfig {
             args?: string[];
         };
     };
-    group?: { kind: string; isDefault: boolean };
+    group?: { kind: string; isDefault: boolean } | string;
     problemMatcher?: string | string[];
-    presentation?: { reveal: string; panel: string };
+    presentation?: { reveal?: string; panel?: string; clear?: boolean };
+    /** Platform-specific overrides (tasks.json `windows` / `linux` / `osx` blocks). */
+    windows?: { command?: string; args?: string[] };
+    linux?: { command?: string; args?: string[] };
+    osx?: { command?: string; args?: string[] };
+    /** Present on script / command tasks created by this extension. */
+    taskManager?: TaskManagerMeta;
     // Parsed fields for UI
     buildFile?: string;
     rawBuildFile?: string;
@@ -42,7 +50,7 @@ export class AntTaskService {
      * Checks all workspace folders and returns the relative path for the matching one.
      * Returns the original path if it's not within any workspace folder.
      */
-    private toWorkspaceRelativePath(absolutePath: string): string {
+    toWorkspaceRelativePath(absolutePath: string): string {
         if (!absolutePath) {return absolutePath;}
         
         const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -59,7 +67,7 @@ export class AntTaskService {
             const folderPath = path.normalize(folder.uri.fsPath);
             const folderLower = isWindows ? folderPath.toLowerCase() : folderPath;
             
-            if (pathLower.startsWith(folderLower)) {
+            if (isInside(pathLower, folderLower)) {
                 const relativePath = normalizedPath.substring(folderPath.length);
                 // Remove leading separator if present
                 const cleanRelative = relativePath.startsWith(path.sep) ? relativePath.substring(1) : relativePath;
@@ -213,7 +221,7 @@ export class AntTaskService {
             const folderPath = path.normalize(folder.uri.fsPath);
             const folderLower = isWindows ? folderPath.toLowerCase() : folderPath;
             
-            if (pathLower.startsWith(folderLower + path.sep) || pathLower === folderLower) {
+            if (isInside(pathLower, folderLower)) {
                 return folder;
             }
         }
@@ -230,13 +238,36 @@ export class AntTaskService {
         if (!tasksPath || !fs.existsSync(tasksPath)) {
             return { version: '2.0.0', tasks: [] };
         }
+        const parsed = parseJsonc(fs.readFileSync(tasksPath, 'utf8'), tasksPath);
+        return { ...parsed, version: parsed.version ?? '2.0.0', tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [] };
+    }
 
+    /**
+     * Read tasks.json without throwing (used for listing: a broken file shows no tasks
+     * instead of breaking the whole view). Writes always go through readTasksJson, which throws.
+     */
+    private tryReadTasksJson(workspaceFolder?: vscode.WorkspaceFolder): { tasks: AntTaskConfig[] } {
         try {
-            const content = fs.readFileSync(tasksPath, 'utf8');
-            return JSON.parse(content);
-        } catch {
-            return { version: '2.0.0', tasks: [] };
+            return this.readTasksJson(workspaceFolder);
+        } catch (e) {
+            console.warn(String(e));
+            return { tasks: [] };
         }
+    }
+
+    /** Write the tasks array of a folder's tasks.json, preserving comments and other properties. */
+    private writeTasksJson(folder: vscode.WorkspaceFolder, tasks: AntTaskConfig[]): void {
+        const vscodeDir = path.join(folder.uri.fsPath, '.vscode');
+        const tasksPath = path.join(vscodeDir, 'tasks.json');
+        fs.mkdirSync(vscodeDir, { recursive: true });
+        const existing = fs.existsSync(tasksPath) ? fs.readFileSync(tasksPath, 'utf8') : '';
+        let content = existing.trim() ? existing : '{\n    "version": "2.0.0",\n    "tasks": []\n}\n';
+        const current = parseJsonc(content, tasksPath); // refuse to rewrite a file we cannot parse
+        if (current.version === undefined) {
+            content = applyJsoncEdit(content, ['version'], '2.0.0');
+        }
+        content = applyJsoncEdit(content, ['tasks'], tasks.map(cleanTask));
+        fs.writeFileSync(tasksPath, content, 'utf8');
     }
 
     /**
@@ -258,42 +289,37 @@ export class AntTaskService {
         if (!workspaceFilePath || !fs.existsSync(workspaceFilePath)) {
             return { tasks: [] };
         }
+        const config = parseJsonc(fs.readFileSync(workspaceFilePath, 'utf8'), workspaceFilePath);
+        const tasks = config.tasks?.tasks;
+        return { tasks: Array.isArray(tasks) ? tasks : [] };
+    }
 
+    private tryReadWorkspaceTasks(): { tasks: AntTaskConfig[] } {
         try {
-            const content = fs.readFileSync(workspaceFilePath, 'utf8');
-            const workspaceConfig = JSON.parse(content);
-            return { tasks: workspaceConfig.tasks?.tasks || [] };
-        } catch {
+            return this.readWorkspaceTasks();
+        } catch (e) {
+            console.warn(String(e));
             return { tasks: [] };
         }
     }
 
     /**
-     * Save tasks to the workspace file (.code-workspace).
+     * Save tasks to the workspace file (.code-workspace), preserving comments and other settings.
      */
     private saveWorkspaceTasks(tasks: AntTaskConfig[]): void {
         const workspaceFilePath = this.getWorkspaceFilePath();
         if (!workspaceFilePath) {
             throw new Error('No workspace file found');
         }
-
-        let workspaceConfig: any = {};
-        if (fs.existsSync(workspaceFilePath)) {
-            try {
-                const content = fs.readFileSync(workspaceFilePath, 'utf8');
-                workspaceConfig = JSON.parse(content);
-            } catch {
-                // If we can't parse, start fresh but preserve folders
-            }
+        let content = fs.existsSync(workspaceFilePath) ? fs.readFileSync(workspaceFilePath, 'utf8') : '{}';
+        const config = parseJsonc(content, workspaceFilePath);
+        if (!config.tasks || typeof config.tasks !== 'object') {
+            content = applyJsoncEdit(content, ['tasks'], { version: '2.0.0', tasks: [] });
+        } else if (config.tasks.version === undefined) {
+            content = applyJsoncEdit(content, ['tasks', 'version'], '2.0.0');
         }
-
-        // Ensure tasks section exists with proper structure
-        if (!workspaceConfig.tasks) {
-            workspaceConfig.tasks = { version: '2.0.0', tasks: [] };
-        }
-        workspaceConfig.tasks.tasks = tasks;
-
-        fs.writeFileSync(workspaceFilePath, JSON.stringify(workspaceConfig, null, 4), 'utf8');
+        content = applyJsoncEdit(content, ['tasks', 'tasks'], tasks.map(cleanTask));
+        fs.writeFileSync(workspaceFilePath, content, 'utf8');
     }
 
     /**
@@ -309,38 +335,65 @@ export class AntTaskService {
      * Workspace-level tasks have _workspaceFolderName set to '__workspace__'.
      */
     getAntTasks(): AntTaskConfig[] {
+        return this.collectTasks(task => this.isAntTask(task));
+    }
+
+    /**
+     * Get every task this extension manages: Ant tasks plus script / command tasks.
+     */
+    getManagedTasks(): AntTaskConfig[] {
+        return this.collectTasks(task => this.isAntTask(task) || this.isScriptTask(task));
+    }
+
+    /** Kind of a managed task. */
+    kindOf(task: AntTaskConfig): TaskKind {
+        return task.taskManager?.kind ?? 'ant';
+    }
+
+    /** The command VS Code will run on this OS (honours the tasks.json `windows` override). */
+    effectiveCommand(task: AntTaskConfig, platform: NodeJS.Platform = process.platform): string {
+        const override = platform === 'win32' ? task.windows : platform === 'darwin' ? task.osx : task.linux;
+        return override?.command || task.command || '';
+    }
+
+    /** True for script / command tasks created by this extension. */
+    isScriptTask(task: AntTaskConfig): boolean {
+        return !!task.taskManager && typeof task.taskManager.kind === 'string';
+    }
+
+    private collectTasks(filter: (task: AntTaskConfig) => boolean): AntTaskConfig[] {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders || workspaceFolders.length === 0) {
             return [];
         }
 
         const allTasks: AntTaskConfig[] = [];
-        
+
         // Get tasks from each workspace folder
         for (const folder of workspaceFolders) {
-            const tasksJson = this.readTasksJson(folder);
-            const antTasks = tasksJson.tasks.filter(task => this.isAntTask(task));
+            const tasksJson = this.tryReadTasksJson(folder);
+            const matching = tasksJson.tasks.filter(filter);
             // Tag each task with its workspace folder for later reference
-            antTasks.forEach(task => {
+            matching.forEach(task => {
                 (task as any)._workspaceFolder = folder;
                 (task as any)._workspaceFolderName = folder.name;
                 (task as any)._isWorkspaceLevel = false;
             });
-            allTasks.push(...antTasks);
+            allTasks.push(...matching);
         }
-        
+
         // Get tasks from workspace file (if multi-root)
         if (this.isMultiRootWorkspace()) {
-            const workspaceTasks = this.readWorkspaceTasks();
-            const antTasks = workspaceTasks.tasks.filter(task => this.isAntTask(task));
-            antTasks.forEach(task => {
+            const workspaceTasks = this.tryReadWorkspaceTasks();
+            const matching = workspaceTasks.tasks.filter(filter);
+            matching.forEach(task => {
                 (task as any)._workspaceFolder = undefined;
                 (task as any)._workspaceFolderName = '__workspace__';
                 (task as any)._isWorkspaceLevel = true;
             });
-            allTasks.push(...antTasks);
+            allTasks.push(...matching);
         }
-        
+
         return allTasks;
     }
 
@@ -348,6 +401,7 @@ export class AntTaskService {
      * Check if a task is an Ant task (by looking at command or args).
      */
     private isAntTask(task: AntTaskConfig): boolean {
+        if (task.taskManager) {return false;}
         if (!task.command) {return false;}
         const cmd = task.command.toLowerCase();
         if (cmd.includes('ant')) {return true;}
@@ -383,7 +437,7 @@ export class AntTaskService {
                 i += 2;
             } else if (arg.startsWith('-')) {
                 // All arguments starting with - are additional args
-                additionalArgsList.push(arg);
+                additionalArgsList.push(quoteArg(arg));
                 i++;
             } else {
                 // Arguments not starting with - are targets
@@ -402,12 +456,21 @@ export class AntTaskService {
      * Run a saved task from tasks.json by its label.
      * This is equivalent to running "Run Task" from the command palette.
      */
-    async runSavedTask(taskLabel: string): Promise<boolean> {
+    async runSavedTask(taskLabel: string, folderName?: string): Promise<boolean> {
         // Fetch all tasks defined in the workspace (including tasks.json)
         const allTasks = await vscode.tasks.fetchTasks();
-        
-        // Find the task by label
-        const taskToRun = allTasks.find(task => task.name === taskLabel);
+
+        // Find the task by label, preferring the one in the requested scope
+        // ('__workspace__' = .code-workspace file, otherwise a workspace folder name)
+        const inScope = (task: vscode.Task) => {
+            if (!folderName) { return true; }
+            if (folderName === '__workspace__') {
+                return task.scope === vscode.TaskScope.Workspace;
+            }
+            return typeof task.scope === 'object' && task.scope.name === folderName;
+        };
+        const byName = allTasks.filter(task => task.name === taskLabel);
+        const taskToRun = byName.find(inScope) ?? byName[0];
         
         if (taskToRun) {
             await vscode.tasks.executeTask(taskToRun);
@@ -603,9 +666,7 @@ export class AntTaskService {
         const args: string[] = [];
         
         for (const line of lines) {
-            // Split by spaces, but respect quoted strings
-            const lineArgs = line.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
-            args.push(...lineArgs.map(arg => arg.trim()).filter(arg => arg !== ''));
+            args.push(...splitArgs(line));
         }
         
         return args;
@@ -633,31 +694,17 @@ export class AntTaskService {
                 throw new Error('No workspace file available. This is only supported in multi-root workspaces.');
             }
             const workspaceTasks = this.readWorkspaceTasks();
-            workspaceTasks.tasks.push(taskConfig);
+            workspaceTasks.tasks.push(toStoredTask(taskConfig));
             this.saveWorkspaceTasks(workspaceTasks.tasks);
-            vscode.window.showInformationMessage(`Ant task saved to workspace file`);
+            vscode.window.showInformationMessage(`Task "${taskConfig.label}" saved to the workspace file`);
         } else {
             // Save to folder's tasks.json
             const targetFolder = workspaceFolder || workspaceFolders[0];
-
-            const vscodeDir = path.join(targetFolder.uri.fsPath, '.vscode');
-            const tasksPath = path.join(vscodeDir, 'tasks.json');
-
-            // Ensure .vscode directory exists
-            if (!fs.existsSync(vscodeDir)) {
-                fs.mkdirSync(vscodeDir, { recursive: true });
-            }
-
             const tasksJson = this.readTasksJson(targetFolder);
+            this.writeTasksJson(targetFolder, [...tasksJson.tasks, toStoredTask(taskConfig)]);
 
-            // Add the new task
-            tasksJson.tasks.push(taskConfig);
-
-            // Write back
-            fs.writeFileSync(tasksPath, JSON.stringify(tasksJson, null, 4), 'utf8');
-            
             const folderInfo = workspaceFolders.length > 1 ? ` (${targetFolder.name})` : '';
-            vscode.window.showInformationMessage(`Ant task saved to tasks.json${folderInfo}`);
+            vscode.window.showInformationMessage(`Task "${taskConfig.label}" saved to tasks.json${folderInfo}`);
         }
     }
 
@@ -685,9 +732,23 @@ export class AntTaskService {
         // Determine if target is workspace file (null means workspace file)
         const targetIsWorkspaceFile = targetWorkspaceFolder === null;
         
+        const stored = toStoredTask(taskConfig);
+
+        // Same location: replace the task where it is, so its position in tasks.json is kept.
+        if (sourceIsWorkspaceFile && targetIsWorkspaceFile) {
+            const workspaceTasks = this.readWorkspaceTasks();
+            const index = workspaceTasks.tasks.findIndex(t => t.label === originalLabel);
+            if (index === -1) {
+                throw new Error(`Task "${originalLabel}" not found in workspace file`);
+            }
+            workspaceTasks.tasks[index] = stored;
+            this.saveWorkspaceTasks(workspaceTasks.tasks);
+            vscode.window.showInformationMessage(`Task "${taskConfig.label}" updated`);
+            return;
+        }
+
         // First, delete from source location
         if (sourceIsWorkspaceFile) {
-            // Delete from workspace file
             const workspaceTasks = this.readWorkspaceTasks();
             const index = workspaceTasks.tasks.findIndex(t => t.label === originalLabel);
             if (index === -1) {
@@ -696,51 +757,43 @@ export class AntTaskService {
             workspaceTasks.tasks.splice(index, 1);
             this.saveWorkspaceTasks(workspaceTasks.tasks);
         } else {
-            // Delete from folder
-            const foldersToSearch = sourceWorkspaceFolder && typeof sourceWorkspaceFolder !== 'string' 
-                ? [sourceWorkspaceFolder] 
+            const foldersToSearch = sourceWorkspaceFolder && typeof sourceWorkspaceFolder !== 'string'
+                ? [sourceWorkspaceFolder]
                 : workspaceFolders;
+            const targetFolder = targetIsWorkspaceFile ? undefined : (targetWorkspaceFolder || workspaceFolders[0]);
             let found = false;
-            
-            for (const folder of foldersToSearch) {
-                const tasksPath = this.getTasksJsonPath(folder);
-                if (!tasksPath) {continue;}
 
+            for (const folder of foldersToSearch) {
                 const tasksJson = this.readTasksJson(folder);
                 const index = tasksJson.tasks.findIndex(t => t.label === originalLabel);
-                
-                if (index !== -1) {
-                    tasksJson.tasks.splice(index, 1);
-                    fs.writeFileSync(tasksPath, JSON.stringify(tasksJson, null, 4), 'utf8');
-                    found = true;
-                    break;
+                if (index === -1) { continue; }
+
+                if (targetFolder && folder.uri.fsPath === targetFolder.uri.fsPath) {
+                    tasksJson.tasks[index] = stored;
+                    this.writeTasksJson(folder, tasksJson.tasks);
+                    vscode.window.showInformationMessage(`Task "${taskConfig.label}" updated`);
+                    return;
                 }
+                tasksJson.tasks.splice(index, 1);
+                this.writeTasksJson(folder, tasksJson.tasks);
+                found = true;
+                break;
             }
-            
+
             if (!found && sourceWorkspaceFolder) {
                 throw new Error(`Task "${originalLabel}" not found`);
             }
         }
 
-        // Then, add to target location
+        // Then, add to the target location
         if (targetIsWorkspaceFile) {
-            // Save to workspace file
             const workspaceTasks = this.readWorkspaceTasks();
-            workspaceTasks.tasks.push(taskConfig);
+            workspaceTasks.tasks.push(stored);
             this.saveWorkspaceTasks(workspaceTasks.tasks);
         } else {
-            // Save to folder
             const targetFolder = targetWorkspaceFolder || workspaceFolders[0];
-            const vscodeDir = path.join(targetFolder.uri.fsPath, '.vscode');
-            const tasksPath = path.join(vscodeDir, 'tasks.json');
-
-            if (!fs.existsSync(vscodeDir)) {
-                fs.mkdirSync(vscodeDir, { recursive: true });
-            }
-
             const tasksJson = this.readTasksJson(targetFolder);
-            tasksJson.tasks.push(taskConfig);
-            fs.writeFileSync(tasksPath, JSON.stringify(tasksJson, null, 4), 'utf8');
+            this.writeTasksJson(targetFolder, [...tasksJson.tasks, stored]);
         }
 
         vscode.window.showInformationMessage(`Task "${taskConfig.label}" updated`);
@@ -783,7 +836,7 @@ export class AntTaskService {
             
             if (index !== -1) {
                 tasksJson.tasks.splice(index, 1);
-                fs.writeFileSync(tasksPath, JSON.stringify(tasksJson, null, 4), 'utf8');
+                this.writeTasksJson(folder, tasksJson.tasks);
                 vscode.window.showInformationMessage(`Task "${label}" deleted`);
                 return;
             }
@@ -803,4 +856,67 @@ export class AntTaskService {
 
         throw new Error(`Task "${label}" not found`);
     }
+}
+
+/** True if `child` is `parent` itself or lies inside it (compares whole path segments). */
+function isInside(child: string, parent: string): boolean {
+    const p = parent.endsWith(path.sep) ? parent.slice(0, -1) : parent;
+    return child === p || child.startsWith(p + path.sep);
+}
+
+/**
+ * Split one line of arguments like a shell does: whitespace separates arguments, and single or
+ * double quotes group text (the quotes themselves are removed). VS Code re-quotes each argument
+ * correctly for the shell that runs the task, so stored args must not contain literal quotes.
+ */
+export function splitArgs(line: string): string[] {
+    const out: string[] = [];
+    const re = /(?:[^\s"']+|"([^"]*)"|'([^']*)')+/g;
+    for (const m of line.matchAll(re)) {
+        out.push(m[0].replace(/"([^"]*)"|'([^']*)'/g, (_q, d, s) => d ?? s));
+    }
+    return out;
+}
+
+/** Inverse of splitArgs for display: quote an argument (or a -D property value) containing whitespace. */
+export function quoteArg(arg: string): string {
+    if (!/\s/.test(arg)) { return arg; }
+    const prop = arg.match(/^(-D[^=]+=)(.*)$/s);
+    return prop ? `${prop[1]}"${prop[2]}"` : `"${arg}"`;
+}
+
+/** Parse a JSON-with-comments file (tasks.json, .code-workspace). Throws on syntax errors. */
+export function parseJsonc(content: string, fileName: string): any {
+    const errors: jsonc.ParseError[] = [];
+    const value = jsonc.parse(content, errors, { allowTrailingComma: true, disallowComments: false });
+    if (errors.length > 0 || value === null || typeof value !== 'object' || Array.isArray(value)) {
+        const first = errors[0];
+        const where = first ? ` (${jsonc.printParseErrorCode(first.error)} at offset ${first.offset})` : '';
+        throw new Error(`Cannot parse ${fileName}${where}. Fix the file before saving tasks so it is not overwritten.`);
+    }
+    return value;
+}
+
+/** Replace the value at `jsonPath`, keeping the rest of the document (comments included) untouched. */
+function applyJsoncEdit(content: string, jsonPath: jsonc.JSONPath, value: unknown): string {
+    const eol = content.includes('\r\n') ? '\r\n' : '\n';
+    const edits = jsonc.modify(content, jsonPath, value, {
+        formattingOptions: { insertSpaces: true, tabSize: 4, eol }
+    });
+    return jsonc.applyEdits(content, edits);
+}
+
+/** Fields the editors attach to a task config for their own use; never written to tasks.json. */
+const UI_ONLY_FIELDS = ['buildFile', 'rawBuildFile', 'targets', 'additionalArgs', 'workingDirectory', 'antHome', 'javaHome', 'shell'];
+
+/** Strip the in-memory bookkeeping fields (`_workspaceFolder`, …) added by collectTasks before persisting. */
+function cleanTask(task: AntTaskConfig): AntTaskConfig {
+    return Object.fromEntries(Object.entries(task).filter(([k]) => !k.startsWith('_'))) as AntTaskConfig;
+}
+
+/** A task config as it should be stored: bookkeeping and editor-only fields removed. */
+export function toStoredTask(task: AntTaskConfig): AntTaskConfig {
+    const out: any = cleanTask(task);
+    for (const key of UI_ONLY_FIELDS) { delete out[key]; }
+    return out;
 }

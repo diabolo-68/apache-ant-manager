@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="sample" default="dist" basedir=".">
+    <description>Sample Ant project used by the tests and screenshots</description>
+
+    <target name="clean" description="Delete build output"/>
+    <target name="init"/>
+    <target name="compile" depends="init" description="Compile the Java sources">
+        <echo message="compiling"/>
+    </target>
+    <target name="test" depends="compile" description="Run unit tests"/>
+    <target name="javadoc" depends="compile" description="Generate API documentation"/>
+    <target name="dist" depends="compile, test" description="Package the application jar"/>
+</project>

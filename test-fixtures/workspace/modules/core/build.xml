@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="core" default="jar">
+    <import file="../../build.xml"/>
+    <target name="jar" depends="compile" description="Build core.jar"/>
+</project>

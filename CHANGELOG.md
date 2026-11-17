@@ -1,9 +1,41 @@
 # Changelog
 
-All notable changes to the "Apache Ant Manager" extension will be documented in this file.
+All notable changes to the "Task Manager" extension (formerly "Apache Ant Manager") will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- **Script and command tasks** - Create tasks for shell, batch, PowerShell, Python and Node.js scripts, and custom commands, with interpreter suggestions (incl. Python virtual environments), arguments, environment variables, terminal and task-group options
+- **Task Manager view** in the Explorer with inline run / edit, duplicate, delete and per-target run for Ant tasks
+- **Re-run last task** status bar item
+- **Command preview**, **Save & Run** and keyboard shortcuts (Ctrl+S, Ctrl+Enter) in the task editors
+- New-task flow lists matching files found in the workspace
+- Test suites: unit tests (mocha), integration tests in VS Code (@vscode/test-cli) and Playwright end-to-end tests, run on Linux, Windows and macOS in CI
+- Platform tests that create and run every script kind the current OS supports (Batch and PowerShell on Windows, shell scripts on Linux/macOS, Python and Node.js everywhere), including script paths and arguments with spaces
+- Animated GIF of the new-task flow in the README, recorded by `npm run screenshots`
+
+### Changed
+
+- Renamed to **Task Manager** (extension ID, command IDs and `apacheAntManager.*` settings are unchanged, so existing installs and tasks keep working)
+- Redesigned Ant task editor: single filterable target list with drag-and-drop ordering, structured arguments, collapsible environment section, inline validation, sticky action bar
+- Task list grouped by workspace folder with relative paths and hover actions
+- Native look: emoji replaced with VS Code codicons
+- Commands are now in the "Task Manager" category
+
+### Fixed
+
+- `tasks.json` files containing comments (VS Code's default template) were read as empty and overwritten on the next save. They are now parsed as JSONC, comments and formatting are kept, and a file that cannot be parsed is never rewritten
+- Self-closing `<target …/>` elements made the XML parser skip the following target
+- Quoted Ant arguments (`-Dmsg="hello world"`) were stored with literal quotes and could be mistaken for targets
+- Editing a task no longer moves it to the end of `tasks.json`
+- A workspace folder whose name starts with another folder's name (`app` / `app-lib`) is no longer treated as inside it
+- Script tasks created on Linux now also run on Windows (and vice versa): default interpreters are stored with a `windows` override
+- Running a task now picks the task from the right workspace folder when several folders have a task with the same name
+- Switching the build file in the editor no longer discards the other form values
 
 ## [1.0.0] - 2026-01-11
 
