@@ -437,7 +437,7 @@ export class AntTaskService {
                 i += 2;
             } else if (arg.startsWith('-')) {
                 // All arguments starting with - are additional args
-                additionalArgsList.push(arg);
+                additionalArgsList.push(quoteArg(arg));
                 i++;
             } else {
                 // Arguments not starting with - are targets
@@ -666,9 +666,7 @@ export class AntTaskService {
         const args: string[] = [];
         
         for (const line of lines) {
-            // Split by spaces, but respect quoted strings
-            const lineArgs = line.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
-            args.push(...lineArgs.map(arg => arg.trim()).filter(arg => arg !== ''));
+            args.push(...splitArgs(line));
         }
         
         return args;
@@ -734,9 +732,23 @@ export class AntTaskService {
         // Determine if target is workspace file (null means workspace file)
         const targetIsWorkspaceFile = targetWorkspaceFolder === null;
         
+        const stored = toStoredTask(taskConfig);
+
+        // Same location: replace the task where it is, so its position in tasks.json is kept.
+        if (sourceIsWorkspaceFile && targetIsWorkspaceFile) {
+            const workspaceTasks = this.readWorkspaceTasks();
+            const index = workspaceTasks.tasks.findIndex(t => t.label === originalLabel);
+            if (index === -1) {
+                throw new Error(`Task "${originalLabel}" not found in workspace file`);
+            }
+            workspaceTasks.tasks[index] = stored;
+            this.saveWorkspaceTasks(workspaceTasks.tasks);
+            vscode.window.showInformationMessage(`Task "${taskConfig.label}" updated`);
+            return;
+        }
+
         // First, delete from source location
         if (sourceIsWorkspaceFile) {
-            // Delete from workspace file
             const workspaceTasks = this.readWorkspaceTasks();
             const index = workspaceTasks.tasks.findIndex(t => t.label === originalLabel);
             if (index === -1) {
@@ -745,43 +757,43 @@ export class AntTaskService {
             workspaceTasks.tasks.splice(index, 1);
             this.saveWorkspaceTasks(workspaceTasks.tasks);
         } else {
-            // Delete from folder
-            const foldersToSearch = sourceWorkspaceFolder && typeof sourceWorkspaceFolder !== 'string' 
-                ? [sourceWorkspaceFolder] 
+            const foldersToSearch = sourceWorkspaceFolder && typeof sourceWorkspaceFolder !== 'string'
+                ? [sourceWorkspaceFolder]
                 : workspaceFolders;
+            const targetFolder = targetIsWorkspaceFile ? undefined : (targetWorkspaceFolder || workspaceFolders[0]);
             let found = false;
-            
-            for (const folder of foldersToSearch) {
-                const tasksPath = this.getTasksJsonPath(folder);
-                if (!tasksPath) {continue;}
 
+            for (const folder of foldersToSearch) {
                 const tasksJson = this.readTasksJson(folder);
                 const index = tasksJson.tasks.findIndex(t => t.label === originalLabel);
-                
-                if (index !== -1) {
-                    tasksJson.tasks.splice(index, 1);
+                if (index === -1) { continue; }
+
+                if (targetFolder && folder.uri.fsPath === targetFolder.uri.fsPath) {
+                    tasksJson.tasks[index] = stored;
                     this.writeTasksJson(folder, tasksJson.tasks);
-                    found = true;
-                    break;
+                    vscode.window.showInformationMessage(`Task "${taskConfig.label}" updated`);
+                    return;
                 }
+                tasksJson.tasks.splice(index, 1);
+                this.writeTasksJson(folder, tasksJson.tasks);
+                found = true;
+                break;
             }
-            
+
             if (!found && sourceWorkspaceFolder) {
                 throw new Error(`Task "${originalLabel}" not found`);
             }
         }
 
-        // Then, add to target location
+        // Then, add to the target location
         if (targetIsWorkspaceFile) {
-            // Save to workspace file
             const workspaceTasks = this.readWorkspaceTasks();
-            workspaceTasks.tasks.push(toStoredTask(taskConfig));
+            workspaceTasks.tasks.push(stored);
             this.saveWorkspaceTasks(workspaceTasks.tasks);
         } else {
-            // Save to folder
             const targetFolder = targetWorkspaceFolder || workspaceFolders[0];
             const tasksJson = this.readTasksJson(targetFolder);
-            this.writeTasksJson(targetFolder, [...tasksJson.tasks, toStoredTask(taskConfig)]);
+            this.writeTasksJson(targetFolder, [...tasksJson.tasks, stored]);
         }
 
         vscode.window.showInformationMessage(`Task "${taskConfig.label}" updated`);
@@ -850,6 +862,27 @@ export class AntTaskService {
 function isInside(child: string, parent: string): boolean {
     const p = parent.endsWith(path.sep) ? parent.slice(0, -1) : parent;
     return child === p || child.startsWith(p + path.sep);
+}
+
+/**
+ * Split one line of arguments like a shell does: whitespace separates arguments, and single or
+ * double quotes group text (the quotes themselves are removed). VS Code re-quotes each argument
+ * correctly for the shell that runs the task, so stored args must not contain literal quotes.
+ */
+export function splitArgs(line: string): string[] {
+    const out: string[] = [];
+    const re = /(?:[^\s"']+|"([^"]*)"|'([^']*)')+/g;
+    for (const m of line.matchAll(re)) {
+        out.push(m[0].replace(/"([^"]*)"|'([^']*)'/g, (_q, d, s) => d ?? s));
+    }
+    return out;
+}
+
+/** Inverse of splitArgs for display: quote an argument (or a -D property value) containing whitespace. */
+export function quoteArg(arg: string): string {
+    if (!/\s/.test(arg)) { return arg; }
+    const prop = arg.match(/^(-D[^=]+=)(.*)$/s);
+    return prop ? `${prop[1]}"${prop[2]}"` : `"${arg}"`;
 }
 
 /** Parse a JSON-with-comments file (tasks.json, .code-workspace). Throws on syntax errors. */

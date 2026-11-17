@@ -217,7 +217,9 @@ export class AntParserService {
         }
 
         // Parse targets
-        const targetRegex = /<target\s+([^>]*)(?:\/>|>[\s\S]*?<\/target>)/gi;
+        // Opening tags only: matching a body up to </target> would let a self-closing
+        // <target .../> swallow the next target. Ant targets never nest.
+        const targetRegex = /<target\b([^>]*?)\/?>/gi;
         let targetMatch;
 
         while ((targetMatch = targetRegex.exec(content)) !== null) {

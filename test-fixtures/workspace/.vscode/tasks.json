@@ -1,0 +1,37 @@
+// Tasks used by the integration and e2e tests. Comments must survive edits.
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "ant",
+            "args": ["-f", "${workspaceFolder}/build.xml", "-Denv=dev", "clean", "dist"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "group": { "kind": "build", "isDefault": false },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "new" }
+        },
+        {
+            "label": "Report",
+            "type": "process",
+            "command": "python3",
+            "windows": { "command": "python" },
+            "args": ["-u", "${workspaceFolder}/scripts/report.py", "--month", "11"],
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated", "clear": false },
+            "detail": "Python · scripts/report.py",
+            "taskManager": { "kind": "python", "interpreterArgs": ["-u"], "script": "${workspaceFolder}/scripts/report.py", "scriptArgs": ["--month", "11"] }
+        },
+        {
+            "label": "Hello",
+            "type": "shell",
+            "command": "echo hello> hello.txt",
+            "args": [],
+            "problemMatcher": [],
+            "presentation": { "reveal": "silent", "panel": "dedicated", "clear": false },
+            "detail": "Custom command",
+            "taskManager": { "kind": "custom", "interpreterArgs": [], "script": "", "scriptArgs": [], "useShell": true }
+        }
+    ]
+}

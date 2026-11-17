@@ -1,199 +1,151 @@
-# Task Manager (formerly Apache Ant Manager)
+# Task Manager for VS Code
 
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/diabolo-68.apache-ant-manager?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=diabolo-68.apache-ant-manager)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/diabolo-68/apache-ant-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/diabolo-68/apache-ant-manager/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A Visual Studio Code extension that provides a graphical UI for configuring and running tasks: Apache Ant builds (similar to Eclipse's Ant launcher), shell, batch, PowerShell, Python and Node.js scripts, and any custom command. Everything is saved as standard VS Code tasks in `tasks.json`.
+Create, edit and run VS Code tasks with a form instead of hand-editing `tasks.json`. Task Manager handles:
+
+- **Apache Ant builds**: pick and order targets, much like Eclipse's Ant launcher
+- **Scripts**: shell (bash, sh, zsh), Batch, PowerShell, Python and Node.js
+- **Any other command**: make, gradle, docker, npm…
+
+Everything is saved as standard VS Code tasks, so your tasks also work with **Run Task**, keybindings and `dependsOn`, and on teammates' machines without the extension.
+
+> Formerly **Apache Ant Manager**. The extension ID, commands and settings are unchanged, so existing installs and tasks keep working.
+
+![Task Manager view in the Explorer and the task list](docs/screenshots/overview.png)
 
 ## Features
 
--  **Task Manager view** - A "Task Manager" section in the Explorer lists your tasks (grouped by workspace folder), with inline run / edit, and duplicate / delete in the context menu
--  **Ant builds** - Parse a build file, pick targets (filterable, with descriptions and dependencies) and order them with drag-and-drop or Alt+↑/↓
--  **Script tasks** - Shell (bash, sh, zsh), Batch (.bat/.cmd), PowerShell (.ps1), Python (.py, detects virtual environments) and Node.js scripts
--  **Custom commands** - Run any program (make, gradle, docker, …), optionally through the shell
--  **Live command preview** - See the exact command line before saving
--  **Environment** - Working directory, environment variables, ANT_HOME / JAVA_HOME, terminal behaviour and task group
--  **Save & Run** - Save a task and run it in one step (Ctrl+Enter); Ctrl+S saves
--  **Re-run last task** - From the status bar
--  **Multi-Root Workspace Support** - Save tasks to any workspace folder or to the shared workspace file, and move them between locations
+- **Task Manager view in the Explorer.** All your tasks in one place, grouped by workspace folder. Run or edit them inline; duplicate and delete them from the context menu.
+- **Ant targets.** The build file is parsed, including imports. Targets come with their descriptions and dependencies, and can be filtered and ordered by drag and drop or <kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd>. Expand an Ant task in the tree to run a single target.
+- **Scripts.** Pick a script and enter its arguments one per line, with no quoting needed. The interpreter is suggested for you, including Python virtual environments in the workspace.
+- **Custom commands.** Run any program directly, or through the shell for pipes and `&&`.
+- **Live command preview.** See exactly what will run before you save.
+- **Environment.** Set the working directory, environment variables and ANT_HOME / JAVA_HOME, choose the terminal behaviour, and add the task to the Build or Test group.
+- **Save & Run** with <kbd>Ctrl</kbd>+<kbd>Enter</kbd>, **Save** with <kbd>Ctrl</kbd>+<kbd>S</kbd>, and **Re-run last task** from the status bar.
+- **Multi-root workspaces.** Save a task in any folder or in the shared `.code-workspace` file, and move it between them.
+- **Safe with your `tasks.json`.** Comments, formatting and tasks the extension doesn't manage are preserved. A file that can't be parsed is never overwritten.
 
-## Screenshots
+## Getting started
 
-### Task Manager View
-![Task Manager Main View](src/resources/task-manager-main-view.png)
+1. Open the **Task Manager** section in the Explorer and click **+** (or run **Task Manager: New Task…**).
+2. Choose what to run.
 
-### Task Configuration
-![Editing Task View - Part 1](src/resources/editing-task-view-part-1.png)
-![Editing Task View - Part 2](src/resources/editing-task-view-part-2.png)
+   ![Choosing the kind of task](docs/screenshots/new-task.png)
 
-### Extension Settings
-![Settings View](src/resources/settings-view.png)
+3. Pick the build file or script. Files of the right type found in the workspace are listed first.
+4. Fill in the form, check the command preview, and click **Save Task** or **Save & Run**.
 
-## Installation
+You can also right-click a build file or script in the Explorer (`.xml`, `.sh`, `.bat`, `.cmd`, `.ps1`, `.py`, `.js`) and select **Create Task from This File**.
 
-### From VS Code Marketplace
+### Ant tasks
 
-1. Open VS Code
-2. Go to Extensions (Ctrl+Shift+X)
-3. Search for "Task Manager" (publisher diabolo-68)
-4. Click **Install**
+![Ant task editor](docs/screenshots/ant-editor.png)
 
-### From Source
+- Tick targets to add them to the **Run order**, then drag them to reorder. The build file's default target is preselected.
+- Add properties (`-Dname=value`) in the property table, tick common options (`-verbose`, `-debug`, `-quiet`, `-keep-going`, `-emacs`), or type any other arguments.
+- Under **Environment**, set the working directory, ANT_HOME, JAVA_HOME and the shell. Values from the extension settings can be filled in with one click.
 
-```bash
-git clone https://github.com/diabolo-68/apache-ant-manager.git
-cd apache-ant-manager
-npm install
-npm run compile
-```
+### Script and command tasks
 
-Then press F5 in VS Code to launch the extension in debug mode.
+![Script task editor](docs/screenshots/script-editor.png)
 
-## Usage
+| Kind | Default interpreter | Stored as |
+|------|---------------------|-----------|
+| Shell script | `bash` | `process` task |
+| Batch script | `cmd.exe /d /c` | `shell` task run by `cmd.exe` |
+| PowerShell script | `pwsh` (Linux/macOS), `powershell.exe` (Windows) | `process` task |
+| Python script | `python3` (Linux/macOS), `python` (Windows) | `process` task |
+| Node.js script | `node` | `process` task |
+| Custom command | — | `process` task, or `shell` task when run through the shell |
 
-### Creating a task
+When a task uses the default interpreter, it's saved with a `windows` override (for example `"command": "python3"` plus `"windows": { "command": "python" }`). The same `tasks.json` then works on Linux, macOS and Windows.
 
-1. **From the Explorer**: click **+** in the *Task Manager* view, then choose the kind of task (Ant build, shell / batch / PowerShell / Python / Node.js script, or custom command) and the file
-2. **From a file**: right-click an Ant build file or a script (`.xml`, `.sh`, `.bat`, `.cmd`, `.ps1`, `.py`, `.js`) and select **Create Task from This File**
-3. **From the Command Palette**: run **Task Manager: New Task…**
-
-### Configuring an Ant task
-
-1. Enter a name for your task and choose where to save it (workspace folder or shared workspace file)
-2. Tick the targets to run; selected targets move to the *Run order* group, where you can drag them (or use Alt+↑/↓) to reorder
-3. Add properties (`-Dname=value`), common options (`-verbose`, `-debug`, …) or other arguments
-4. Optionally expand **Environment** to set the working directory, ANT_HOME, JAVA_HOME or the terminal shell
-5. Check the **Command preview**, then **Save Task** (Ctrl+S) or **Save & Run** (Ctrl+Enter)
-
-### Configuring a script or command task
-
-1. Pick the script (or, for a custom command, the program) and enter arguments, one per line
-2. Adjust the interpreter if needed — suggestions include virtual environments found in the workspace for Python
-3. Optionally set the working directory, environment variables, terminal behaviour and task group (Build / Test)
-
-Script tasks are stored as regular `process` tasks (batch files and shell-mode custom commands as `shell` tasks), so they also appear in VS Code's **Run Task** list. A `taskManager` block in each entry lets the editor reopen it with the same settings.
+Each entry also stores a small `taskManager` block, which lets the editor reopen the task with exactly the same form values.
 
 ### Managing tasks
 
-- **Run**: click ▶ next to a task in the Task Manager view, use **Task Manager: Run Task…**, VS Code's built-in **Run Task**, or the re-run button in the status bar
-- **Run a single Ant target**: expand an Ant task in the tree and click ▶ next to a target
-- **Edit / Duplicate / Delete**: from the tree's inline buttons and context menu, or from the full-page list (**Task Manager: Open Task Manager**)
+![The Task Manager view](docs/screenshots/explorer-view.png)
 
-### Multi-Root Workspace Support
-
-When working with multi-root workspaces:
-- Tasks are grouped by the folder they belong to
-- You can save tasks to any workspace folder or to the shared workspace file
-- Moving tasks between folders is supported when editing
+- **Run.** Click ▶ next to a task, use **Task Manager: Run Task…**, VS Code's **Run Task**, or the re-run button in the status bar.
+- **Edit.** Click a script task, click the pencil icon on any task, or run **Task Manager: Edit Task…**.
+- **Duplicate / Delete.** Use the context menu, or <kbd>Delete</kbd> in the view.
+- **Full-page list.** Run **Task Manager: Open Task Manager**.
 
 ## Requirements
 
-- **Visual Studio Code** 1.85.0 or higher
-- **Apache Ant** (for Ant tasks) - Should be installed and accessible via PATH, or configured via ANT_HOME
-- The interpreter for your scripts (bash, PowerShell, Python, Node.js, …) on PATH, or configured per task
+- VS Code 1.96 or later, on Windows, Linux or macOS.
+- [Apache Ant](https://ant.apache.org/) for Ant tasks, on `PATH` or set via ANT_HOME.
+- The interpreter for your scripts (bash, PowerShell, Python, Node.js…), on `PATH` or set per task.
+- *Optional:* Java 11+ for the Java-based Ant parser (`apacheAntManager.useJavaParser`).
 
-### Optional
-
-- **Java Runtime Environment (JRE) 11+** - Required only if using the Java parser option for advanced Ant property resolution
-
-## Extension Settings
-
-This extension contributes the following settings:
+## Settings
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `apacheAntManager.antHome` | `""` | Path to Apache Ant installation directory (ANT_HOME). Required if your build files use custom Ant tasks or libraries. |
-| `apacheAntManager.javaHome` | `""` | Path to Java installation directory (JAVA_HOME). Required if Java is not in your PATH. |
-| `apacheAntManager.importDepth` | `2` | Maximum depth level for following import/include statements in build files. Set to 0 to parse only the main file. |
-| `apacheAntManager.useJavaParser` | `false` | Use the Java Ant parser instead of the fast XML parser. The Java parser resolves Ant properties but is slower. |
+| `apacheAntManager.antHome` | `""` | Apache Ant installation directory (ANT_HOME). Needed if your build files use custom Ant tasks or libraries. |
+| `apacheAntManager.javaHome` | `""` | Java installation directory (JAVA_HOME). Needed if Java is not on your `PATH`. |
+| `apacheAntManager.importDepth` | `2` | How many levels of `<import>` / `<include>` to follow when listing targets. `0` parses only the main file. |
+| `apacheAntManager.useJavaParser` | `false` | Use the Java Ant parser, which resolves Ant properties but is slower, instead of the built-in XML parser. |
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `Task Manager: New Task…` | Create an Ant, script or command task |
-| `Task Manager: Run Task…` | Pick a managed task and run it |
-| `Task Manager: Re-run Last Task` | Run the most recently run task again |
-| `Task Manager: Edit Task…` / `Duplicate Task…` / `Delete Task…` | Manage existing tasks |
-| `Task Manager: Open Task Manager` | Open the full-page task list |
-| `Task Manager: Refresh` | Reload tasks from `tasks.json` |
+| **Task Manager: New Task…** | Create an Ant, script or command task |
+| **Task Manager: Run Task…** | Pick a task and run it |
+| **Task Manager: Re-run Last Task** | Run the most recently run task again |
+| **Task Manager: Edit Task…** / **Duplicate Task…** / **Delete Task…** | Manage existing tasks |
+| **Task Manager: Open Task Manager** | Open the full-page task list |
+| **Task Manager: Refresh** | Reload tasks from `tasks.json` |
 
-## Building from Source
+## Development
 
-### Prerequisites
-
-- Node.js 18+
-- npm
-
-### Optional (for Java parser)
-
-- Java JDK 11+
-- Maven 3.6+
-
-### Build Steps
+You need Node.js 20 or later. A JDK 11+ and Maven are needed only for the optional Java parser in `java/`. Everything works the same on Windows and Linux. The repository stores LF line endings everywhere except `.bat`/`.cmd` files (see `.gitattributes`).
 
 ```bash
-# Install dependencies
 npm install
-
-# Compile TypeScript
-npm run compile
-
-# (Optional) Build Java parser component
-cd java
-mvn package
-cd ..
-
-# Run in debug mode - Press F5 in VS Code
+npm run compile          # bundle the extension with webpack
+# press F5 in VS Code to start an Extension Development Host
 ```
 
-### Project Structure
+### Tests
+
+| Command | What it runs |
+|---------|--------------|
+| `npm run test:unit` | Mocha unit tests for the services, parser and tree view, in plain Node with a `vscode` stub. Fast, no VS Code needed. |
+| `npm run test:integration` | Integration tests inside a real VS Code, downloaded to `.vscode-test/`, against a copy of `test-fixtures/workspace`. |
+| `npm test` | Lint, then unit and integration tests |
+| `npm run test:e2e` | [Playwright](https://playwright.dev/) end-to-end tests that drive the VS Code UI: the Explorer view, quick picks and the webview editors |
+| `npm run screenshots` | Regenerates the images in `docs/screenshots/` from the sample workspace |
+
+On Linux without a display, prefix the VS Code-based suites with `xvfb-run -a`. The CI workflow runs all suites on Ubuntu and Windows.
+
+### Project structure
 
 ```
-apache-ant-manager/
-├── src/                    # TypeScript extension source
-│   ├── extension.ts        # Extension entry point
-│   ├── panels/             # Webview panels
-│   ├── providers/          # Tree view providers
-│   ├── services/           # Business logic services
-│   └── types/              # TypeScript type definitions
-├── java/                   # Java Ant parser component (optional)
-│   ├── pom.xml
-│   └── src/main/java/
-├── media/                  # Webview CSS and assets
-└── .vscode/                # VS Code configuration
+src/
+├── extension.ts            # activation and command registration
+├── taskActions.ts          # run / edit / duplicate / delete, status bar
+├── panels/                 # webview editors (Ant, script) and the task list
+├── services/               # tasks.json I/O, Ant parsing, script task conversion
+├── views/                  # Explorer tree view
+├── types/  util/
+└── test/
+    ├── unit/               # mocha + vscode stub
+    └── integration/        # @vscode/test-cli
+e2e/                        # Playwright tests and screenshot generator
+test-fixtures/workspace/    # sample project used by the tests
+java/                       # optional Java-based Ant parser
+media/                      # webview CSS and codicons
 ```
-
-## Known Issues
-
-- The Java parser option requires Java 11+ and may be slower for large build files with many imports
-- Target descriptions are only shown if defined in the build file's `description` attribute
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## Repository
-
-- **GitHub**: [https://github.com/diabolo-68/apache-ant-manager](https://github.com/diabolo-68/apache-ant-manager)
-- **Issues**: [https://github.com/diabolo-68/apache-ant-manager/issues](https://github.com/diabolo-68/apache-ant-manager/issues)
+Issues and pull requests are welcome at [github.com/diabolo-68/apache-ant-manager](https://github.com/diabolo-68/apache-ant-manager). Please run `npm test` and `npm run test:e2e` before opening a pull request.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Inspired by Eclipse's Ant Build configuration dialog
-- Uses the [Apache Ant](https://ant.apache.org/) build tool
-- Built with the [VS Code Extension API](https://code.visualstudio.com/api)
-
----
-
-**Enjoy building with Ant! 🐜**
+[MIT](LICENSE)

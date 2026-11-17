@@ -14,11 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Re-run last task** status bar item
 - **Command preview**, **Save & Run** and keyboard shortcuts (Ctrl+S, Ctrl+Enter) in the task editors
 - New-task flow lists matching files found in the workspace
+- Test suites: unit tests (mocha), integration tests in VS Code (@vscode/test-cli) and Playwright end-to-end tests, run on Linux and Windows in CI
 
 ### Changed
 
 - Renamed to **Task Manager** (extension ID, command IDs and `apacheAntManager.*` settings are unchanged, so existing installs and tasks keep working)
-
 - Redesigned Ant task editor: single filterable target list with drag-and-drop ordering, structured arguments, collapsible environment section, inline validation, sticky action bar
 - Task list grouped by workspace folder with relative paths and hover actions
 - Native look: emoji replaced with VS Code codicons
@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `tasks.json` files containing comments (VS Code's default template) were read as empty and overwritten on the next save. They are now parsed as JSONC, comments and formatting are kept, and a file that cannot be parsed is never rewritten
+- Self-closing `<target …/>` elements made the XML parser skip the following target
+- Quoted Ant arguments (`-Dmsg="hello world"`) were stored with literal quotes and could be mistaken for targets
+- Editing a task no longer moves it to the end of `tasks.json`
+- A workspace folder whose name starts with another folder's name (`app` / `app-lib`) is no longer treated as inside it
+- Script tasks created on Linux now also run on Windows (and vice versa): default interpreters are stored with a `windows` override
 - Running a task now picks the task from the right workspace folder when several folders have a task with the same name
 - Switching the build file in the editor no longer discards the other form values
 

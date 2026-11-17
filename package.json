@@ -24,7 +24,8 @@
     "Other"
   ],
   "activationEvents": [
-    "workspaceContains:**/build.xml"
+    "workspaceContains:**/build.xml",
+    "workspaceContains:.vscode/tasks.json"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -224,9 +225,17 @@
     "compile": "webpack",
     "watch": "webpack --watch",
     "package": "webpack --mode production --devtool hidden-source-map",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test"
+    "compile-tests": "tsc -p .",
+    "watch-tests": "tsc -p . -w",
+    "lint": "eslint src e2e",
+    "typecheck": "tsc -p . --noEmit && tsc -p e2e --noEmit",
+    "pretest": "npm run compile && npm run compile-tests && npm run lint",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "mocha",
+    "test:integration": "vscode-test",
+    "test:e2e": "npm run compile && playwright test --project=e2e",
+    "screenshots": "npm run compile && playwright test --project=screenshots",
+    "test:all": "npm test && npm run test:e2e"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

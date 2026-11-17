@@ -507,7 +507,7 @@ let props = [];
     const other = [];
     for (const tok of tokenize(INIT.values.additionalArgs)) {
         const m = tok.match(/^-D([^=]+)=(.*)$/);
-        if (m) { props.push({ key: m[1], value: m[2] }); continue; }
+        if (m) { props.push({ key: m[1], value: m[2].replace(/^(["'])(.*)\1$/, '$2') }); continue; }
         const flag = tok === '-v' ? '-verbose' : tok === '-d' ? '-debug' : tok === '-q' ? '-quiet' : tok === '-k' ? '-keep-going' : tok;
         const box = document.querySelector('[data-flag="' + CSS.escape(flag) + '"]');
         if (box) { box.checked = true; continue; }

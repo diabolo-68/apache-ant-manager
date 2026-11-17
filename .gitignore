@@ -5,3 +5,8 @@ node_modules
 *.vsix
 .DS_Store
 java/target/
+playwright-report/
+test-results/
+e2e/**/*.js
+e2e/**/*.js.map
+/playwright.config.js*
