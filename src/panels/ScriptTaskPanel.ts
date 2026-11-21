@@ -310,16 +310,18 @@ export class ScriptTaskPanel {
     </section>
     <datalist id="interpreterList"></datalist>
 
-    <details class="card" id="envSection" ${spec.cwd || Object.keys(spec.env).length ? 'open' : ''}>
-        <summary>Environment <span class="summary-hint" id="envSummary"></span></summary>
-        <div class="form-grid">
-            <label for="cwd">Working directory</label>
-            <div class="input-group">
-                <input type="text" id="cwd" value="${escapeHtml(spec.cwd)}" placeholder="Workspace folder (default)" spellcheck="false">
-                <button class="icon-btn" id="browseCwd" title="Browse…" aria-label="Browse for working directory">${icon('folder-opened')}</button>
-            </div>
+    <section class="card">
+        <h2>Working directory</h2>
+        <p class="help-text">The folder the task runs in. Leave empty to use the workspace folder.</p>
+        <div class="input-group">
+            <input type="text" id="cwd" value="${escapeHtml(spec.cwd)}" placeholder="Workspace folder (default)" spellcheck="false" aria-label="Working directory">
+            <button class="secondary" id="useScriptDir" title="Use the folder that contains the script">Script folder</button>
+            <button class="icon-btn" id="browseCwd" title="Browse…" aria-label="Browse for working directory">${icon('folder-opened')}</button>
         </div>
-        <div class="subheading">Environment variables</div>
+    </section>
+
+    <details class="card" id="envSection" ${Object.keys(spec.env).length ? 'open' : ''}>
+        <summary>Environment variables <span class="summary-hint" id="envSummary"></span></summary>
         <div class="prop-list" id="envList"></div>
         <button class="inline-link" id="addEnv">${icon('add')} Add variable</button>
     </details>
@@ -401,6 +403,7 @@ function applyKind(prevKind) {
     $('scriptCard').hidden = isCustom;
     $('interpreterCard').hidden = isCustom;
     $('commandCard').hidden = !isCustom;
+    $('useScriptDir').hidden = isCustom;
     $('kindIcon').innerHTML = '<i class="codicon codicon-' + k.icon + '" aria-hidden="true"></i>';
     $('pageTitle').textContent = (INIT.isEdit ? 'Edit ' : 'New ') + k.label;
     $('scriptHeading').textContent = k.label.replace(/ script$/, '') + ' script';
@@ -532,7 +535,6 @@ function renderPreview(s) {
     text = '# in ' + (s.cwd || 'the workspace folder') + '\n' + text;
     $('commandPreview').textContent = text;
     const summary = [];
-    if (s.cwd) { summary.push('custom working directory'); }
     if (envKeys.length) { summary.push(envKeys.length + ' variable' + (envKeys.length > 1 ? 's' : '')); }
     $('envSummary').textContent = summary.length ? '— ' + summary.join(', ') : '';
 }
@@ -583,6 +585,12 @@ $('interpreter').addEventListener('blur', () => { touched.add('interpreter'); on
 $('useShell').addEventListener('change', () => applyKind());
 document.querySelectorAll('[data-browse-interpreter]').forEach(b => b.addEventListener('click', () => vscode.postMessage({ command: 'browseInterpreter' })));
 $('browseCwd').addEventListener('click', () => vscode.postMessage({ command: 'browseDirectory' }));
+$('useScriptDir').addEventListener('click', () => {
+    const p = $('script').value.trim();
+    const i = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+    $('cwd').value = i > 0 ? p.slice(0, i) : '';
+    onChange();
+});
 
 $('taskName').addEventListener('input', () => { nameTouched = true; });
 $('taskName').addEventListener('blur', () => { touched.add('taskName'); onChange(); });
