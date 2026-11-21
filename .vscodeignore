@@ -33,3 +33,4 @@ test-output.txt
 playwright-output.txt
 java/target/**
 !java/target/ant-parser.jar
+.node-version
