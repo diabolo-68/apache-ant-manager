@@ -21,14 +21,21 @@ const skipMarketplace = args.includes('--skip-marketplace');
 let skipOpenVSX = args.includes('--skip-openvsx');
 
 // --- Helpers ---
-// shell: true so that "npx" resolves to npx.cmd on Windows; every argument is a fixed
-// string or the package-derived .vsix name, never user input.
+// Run a locally installed package's CLI with the current Node, without a shell, so
+// arguments are passed as-is (no npx.cmd / shell: true needed on Windows).
+function binPath(pkgName) {
+    const pkgJsonPath = require.resolve(`${pkgName}/package.json`, { paths: [__dirname] });
+    const { bin } = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+    const rel = typeof bin === 'string' ? bin : Object.values(bin)[0];
+    return path.join(path.dirname(pkgJsonPath), rel);
+}
+
 function npx(npxArgs, opts) {
-    const all = ['--no-install', ...npxArgs];
+    const [pkgName, ...cliArgs] = npxArgs;
     if (!opts || opts.stdio !== 'pipe') {
-        console.log(`  > npx ${all.join(' ')}`);
+        console.log(`  > ${pkgName} ${cliArgs.join(' ')}`);
     }
-    return execFileSync('npx', all, { stdio: 'inherit', cwd: __dirname, shell: true, ...opts });
+    return execFileSync(process.execPath, [binPath(pkgName), ...cliArgs], { stdio: 'inherit', cwd: __dirname, ...opts });
 }
 
 function npxAvailable(pkgName) {
