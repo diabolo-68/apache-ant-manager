@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-21
+
+### Changed
+
+- **Working directory** in the script task editor now has its own always-visible card (it was hidden in the collapsed Environment section), with a **Script folder** button that uses the folder containing the script
+
 ## [1.1.0] - 2026-11-17
 
 ### Added
